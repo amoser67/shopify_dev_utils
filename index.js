@@ -172,13 +172,13 @@ function update_theme(type) {
 
         function reload_socket(data, reason) {
             if (data === null) throw reason;
-            log(data.log_type, key);
+            log(data.log_type, data.key);
             websocket.terminate();
         }
 
         return function update_scripts(event, file_path) {
             try {
-                if (event === "addDir" || event === "add") {
+                if (event === "addDir" || event === "add" || event === "unlinkDir" || "unlink") {
                     start_delay();
                     if (count > 1) return;
                 }
@@ -188,6 +188,7 @@ function update_theme(type) {
                 if (event === "addDir" || event === "unlinkDir") {
                     const dir_name = path_parsed.base;
                     const key = `assets/${dir_name}.min.js`;
+                    data.key = key;
                     const min_local_path = `${paths.theme}/${key}`;
                     if (event === "addDir") {
                         requestors = [
@@ -215,6 +216,7 @@ function update_theme(type) {
                     }
 
                     const key = `assets/${min_base}`;
+                    data.key = key;
 
                     if (
                         event === "change"
@@ -231,11 +233,18 @@ function update_theme(type) {
                             requestors = [ process_js(file_path, key) ];
                         }
                     } else if (event === "unlink" && module_is_file) {
-                        requestors = [ ShopifyAPI.delete_file(key) ];
+                        const min_local_path = `${paths.theme}/${key}`;
+                        requestors = [
+                            ShopifyAPI.delete_file(key),
+                            Fs.unlink_file(min_local_path)
+                        ];
+
                         data.log_type = "Deleted";
                     }
                 }
-                return run_sync(requestors, reload_socket, data);
+                if (requestors.length > 0) {
+                    return run_sync(requestors, reload_socket, data);
+                }
             } catch (exception) {
                 log("Error", exception);
             }
