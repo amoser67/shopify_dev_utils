@@ -2,12 +2,17 @@
 
 
 ## README Sections
-+ [Purpose of Project][1]
 
-[1]: #Features
-[2]: #Overview
++ [Purpose](#Purpose)
++ [Features](#Features)
++ [Directory Structure](#DirectoryStructure)
++ [Scripts](#Scripts)
++ [Styles](#Styles)
++ [Theme](#Theme)
++ [Setup](#Setup)
 
-## Purpose of Project
+
+## Purpose
 
 To provide a stable and customizable development environment for working on Shopify
 sites, meant to replace working with a combination of gulp / themekit.
@@ -29,7 +34,7 @@ watches them for changes.  When changes occur the file's contents are minified a
 written to theme/assets file according to the procedure below.
 
 
-## Overview
+## Directory Structure
 
 Expected Directory Structure:
 
@@ -41,6 +46,7 @@ Expected Directory Structure:
         package.json
         run.js
 
+
 ## Scripts
 
 The scripts directory can contain files and sub-directories, however these sub-directories
@@ -51,6 +57,7 @@ We refer to the JS files we add to theme/assets as *modules*. Each module corres
 to either the minified contents of a *primary* file or the minified and concatenated contents
 of all *secondary* files within a sub-directory.  In other words, each sub-directory and *primary*
 file in scripts are associated with a *module* of the same name in theme/assets.
+
 
 ## Styles
 
@@ -82,7 +89,7 @@ sub-directory component removed, so the uploaded version of these three *theme* 
 will end up being a flattened version of their local counterparts.
 
 
-**Setup**
+## Setup
 
 1. Make sure you are using node v13+.
 
