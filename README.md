@@ -1,4 +1,4 @@
-Shopify Development Utilities Project
+**Shopify Development Utilities Project**
 
 
 **Purpose of Project**
