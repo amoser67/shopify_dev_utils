@@ -101,19 +101,17 @@ will end up being a flattened version of their local counterparts.
 
 1. Make sure you are using node v13+.
 
-2. $ npm i shopify_dev_utils
+2. `$ npm i shopify_dev_utils`
 
-3. $ npm i dot-env
+3. `$ npm i dot-env`
 
 4. Create a private app with read/write theme privileges.
 
 5. Create a .env file and place it in project_root.  It should resemble the following:
 
-    AUTH = [private-app-key]:[private-app-pass]
-    
-    THEME_ID = 1234567891
-    
-    STORE_URL = test-alpha-bravo.myshopify.com
+    AUTH = [private-app-key]:[private-app-pass]<br />
+    THEME_ID = 1234567891<br />
+    STORE_URL = test-alpha-bravo.myshopify.com<br />
 
     Replacing the bracketed values with your private app info, and making sure to add
     your own theme id and store url.  Note, if you are editing an unpublished theme,
@@ -156,6 +154,6 @@ and then use xcode to compile jsmin.c to mac OS compatible executable named jsmi
 If someone sends me a copy of this executable file I will add it in to the project
 to prevent others from having to do this.
 
-8. $ node run
+8. `$ node run`
 
 9. Environment should be setup and running!
