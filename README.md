@@ -36,6 +36,7 @@ Expected Directory Structure:
         run.js
 
 **scripts**
+
 The *scripts* directory can contain files and sub-directories, however these sub-directories
 may not contain additional directories. We refer to the files which are in the *scripts*
 directory as *primary* files, and the files which are in the sub-directories as *secondary* files.
@@ -46,6 +47,7 @@ of all *secondary* files within a sub-directory.  In other words, each sub-direc
 file in *scripts* are associated with a *module* of the same name in *theme/assets*.
 
 **styles**
+
 The *styles* directory is meant to contain scss files and sub-directories, and
 unlike *scripts*, there is no limit to sub-directory nesting.  However, at this point
 modulation of *styles* is not supported, so there must be a *primary* file in the *styles*
@@ -54,7 +56,9 @@ its contents compiled to css, minified, and written to *theme/assets/main.css.li
 
 
 **theme**
+
 The theme directory is expected to contain at least the following directories:
+
 - assets
 - layout
 - locales
@@ -73,6 +77,7 @@ will end up being a flattened version of their local counterparts.
 
 
 **Setup**
+
 1. Make sure you are using node v13+.
 
 2. $ npm i shopify_dev_utils
