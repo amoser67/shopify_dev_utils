@@ -4,7 +4,8 @@
 ## README Sections
 + [Purpose of Project][1]
 
-[1]: https://github.com/amoser67/shopify_dev_utils/blob/master/README.md#Features
+[1]: #Features
+[2]: #Overview
 
 ## Purpose of Project
 
