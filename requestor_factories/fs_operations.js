@@ -1,15 +1,23 @@
 "use strict";
-const { execFile } = require("child_process");
+const { exec } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const process = require("process");
 const { run_sync, run_async } = require("../utils");
 const chokidar = require("chokidar");
 const sass = require("node-sass");
+// const jsmin = require("jsmin").jsmin
 const ShopifyAPI = require("./api_requests.js");
 const { log } = require("../log");
 const requestor_factories_dir = __dirname;
 const shopify_dev_utils_dir = path.dirname(__dirname);
-const jsmin_dir = shopify_dev_utils_dir + "/JSMin-master";
+let jsmin_path = shopify_dev_utils_dir + "/JSMin-master/jsmin";
+const platform = process.platform;
+if (platform === "win32") {
+    jsmin_path += ".exe";
+} else if (platform === "darwin") {
+    jsmin_path.replace("/jsmin", "/jsmin-darwin");
+}
 
 
 //  Module Public Methods:
@@ -125,23 +133,17 @@ const get_all_file_paths = function (base_dir) {
 //  @param2 {string}       output  - The path to the output file.
 const minify_js = function (input, output) {
     const input_is_string = (typeof input === "string");
-    const options = { cwd: jsmin_dir };
 
     if (input_is_string) {
         return function minify_js_requestor(cb, data) {
             try {
-                execFile(
-                    "jsmin",
-                    [ input ],
-                    options,
-                    function write_to_output(error, stdout) {
-                        if (error) return cb(null, error);
-                        fs.writeFile(output, stdout, function (err) {
-                            if (err) return cb(null, err);
-                            return cb(data);
-                        });
+                const command = jsmin_path + ' <' + input + ' >' + output;
+                exec(command, function (err, stdout, stderr) {
+                    if (err || stderr) {
+                        return cb(null, err || stderr);
                     }
-                );
+                    return cb(data);
+                });
             } catch (exception) {
                 return cb(null, exception);
             }
@@ -149,39 +151,59 @@ const minify_js = function (input, output) {
     } else {
         return function minify_js_requestors(cb, data) {
             try {
-                const min_js_array = [];
-                const max = input.length;
-                const requestors = input.map(file => minify_file(file));
-                function minify_file(file) {
-                    return function minify_file_requestor(cb, data) {
-                        try {
-                            execFile(
-                                "jsmin",
-                                [ file ],
-                                options,
-                                function push_to_min_js(error, stdout) {
-                                    if (error) return cb(null, error);
-                                    min_js_array.push(stdout);
-                                    return cb(data)
-                                }
-                            );
-                        } catch (exception) {
-                            return cb(null, exception);
-                        }
+                // 1. if input is not an array, throw an error.
+                if (!Array.isArray(input)) {
+                    throw new TypeError("input is not of type array.");
+                }
+
+                // 2. Let fileData = [];
+                const file_data = [];
+
+                // 3. Let moduleName be name of the module being minified.
+                let module_name;
+                const output_parts = output.split("/");
+                const output_name = output.split("/")[output_parts.length - 1];
+                module_name = output_name.replace(".min.js", "");
+
+                // 4. for each file path in input:
+                //      a. read the file and push the file's content to fileData.
+                const requestors = input.map(function (file_path) {
+                    return getModuleData(file_path);
+                });
+
+                function getModuleData(file_path) {
+                    return function getModuleDataRequestor(cb) {
+                        fs.readFile(file_path, "utf-8", function (err, text) {
+                            if (err) return cb(null, err);
+                            file_data.push(text);
+                            return cb();
+                        });
                     }
                 }
-                run_async(
-                    requestors,
-                    function (data, reason) {
-                        if (data === null) throw reason;
-                        const min_js = min_js_array.join("");
-                        fs.writeFile(output, min_js, function (err) {
-                            if (err) return cb(null, err);
-                            return cb(data);
+
+                run_async(requestors, write_data);
+
+                function write_data(data, reason) {
+                    if (data === null) throw reason;
+                    // Let moduleText be the result of fileData.join().
+                    const module_text = file_data.join();
+                    const local_data_path = `${shopify_dev_utils_dir}/local-data/${module_name}`;
+
+                    // Write moduleText to ../local-data/moduleName
+                    fs.writeFileSync(local_data_path, module_text);
+
+                    const command = jsmin_path + ' <' + local_data_path + ' >' + output;
+
+                    exec(command, function (err, stdout, stderr) {
+                        if (err || stderr) {
+                            return cb(null, err || stderr);
+                        }
+                        fs.unlink(local_data_path, function (err) {
+                            if (err) log("Error", err);
                         });
-                    },
-                    Object.create(null)
-                );
+                        return cb(data);
+                    });
+                }
             } catch (exception) {
                 return cb(null, exception);
             }
