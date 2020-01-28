@@ -1,6 +1,7 @@
 # Shopify Development Utilities Project
 
 
+
 ## README Sections
 
 + [Purpose](#Purpose)
@@ -12,10 +13,12 @@
 + [Setup](#Setup)
 
 
+
 ## Purpose
 
 To provide a stable and customizable development environment for working on Shopify
 sites, meant to replace working with a combination of gulp / themekit.
+
 
 
 ## Features
@@ -34,6 +37,7 @@ watches them for changes.  When changes occur the file's contents are minified a
 written to theme/assets file according to the procedure below.
 
 
+
 ## Directory Structure
 
 Expected Directory Structure:
@@ -45,6 +49,7 @@ Expected Directory Structure:
         node_modules
         package.json
         run.js
+
 
 
 ## Scripts
@@ -59,6 +64,7 @@ of all *secondary* files within a sub-directory.  In other words, each sub-direc
 file in scripts are associated with a *module* of the same name in theme/assets.
 
 
+
 ## Styles
 
 The styles directory is meant to contain scss files and sub-directories, and
@@ -66,6 +72,7 @@ unlike scripts, there is no limit to sub-directory nesting.  However, at this po
 modulation of styles is not supported, so there must be a *primary* file in the styles
 directory named *main.scss*, and when a change ocurrs in a scss file, *main.scss* will have
 its contents compiled to css, minified, and written to theme/assets/main.css.liquid.
+
 
 
 ## Theme
@@ -87,6 +94,7 @@ the exception of *templates/customers*, they can exist locally here because when
 files are uploaded their *key* (denotes file's relative path in *theme*), has the
 sub-directory component removed, so the uploaded version of these three *theme* directories
 will end up being a flattened version of their local counterparts.
+
 
 
 ## Setup
