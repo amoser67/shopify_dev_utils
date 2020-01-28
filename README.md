@@ -87,8 +87,11 @@ will end up being a flattened version of their local counterparts.
 4. Create a private app with read/write theme privileges.
 
 5. Create a .env file and place it in project_root.  It should resemble the following:
+
     AUTH = [private-app-key]:[private-app-pass]
+    
     THEME_ID = 1234567891
+    
     STORE_URL = test-alpha-bravo.myshopify.com
 
     Replacing the bracketed values with your private app info, and making sure to add
