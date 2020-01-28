@@ -34,7 +34,7 @@
     "ws": "^7.2.1"
   },
   "deprecated": false,
-  "description": "",
+  "description": "Provides stable and customizable development environment for working on Shopify sites, meant to replace working with a combination of gulp / themekit.",
   "license": "ISC",
   "main": "api_requests.js",
   "name": "shopify_dev_utils",
@@ -48,5 +48,5 @@
     "shopify proxy",
     "browser reload"
   ],
-  "version": "1.0.10"
+  "version": "1.0.11"
 }
