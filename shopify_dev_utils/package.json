@@ -1,27 +1,27 @@
 {
-  "_from": "shopify_dev_utils@^1.0.1",
-  "_id": "shopify_dev_utils@1.0.4",
+  "_from": "shopify_dev_utils@^1.0.4",
+  "_id": "shopify_dev_utils@1.0.7",
   "_inBundle": false,
-  "_integrity": "sha512-ERBom7sAXK6kySMfsoY1SeLZFHWPC5TmzkJXClaEGbsBpaax0Yn8SEZTmvFXTYrw7XU/KGxDBGG08ZX1bMzqZg==",
+  "_integrity": "sha512-ZEETjW1bmWndqZUKBSNhc+FzKK8vmdwaLWRmjOJ+gOgvLRYs8EQ+ymnWsa0Wr4Vyj/EirMWGEiiLauJ4p2NeLA==",
   "_location": "/shopify_dev_utils",
   "_phantomChildren": {},
   "_requested": {
     "type": "range",
     "registry": true,
-    "raw": "shopify_dev_utils@^1.0.1",
+    "raw": "shopify_dev_utils@^1.0.4",
     "name": "shopify_dev_utils",
     "escapedName": "shopify_dev_utils",
-    "rawSpec": "^1.0.1",
+    "rawSpec": "^1.0.4",
     "saveSpec": null,
-    "fetchSpec": "^1.0.1"
+    "fetchSpec": "^1.0.4"
   },
   "_requiredBy": [
     "#USER",
     "/"
   ],
-  "_resolved": "https://registry.npmjs.org/shopify_dev_utils/-/shopify_dev_utils-1.0.4.tgz",
-  "_shasum": "6dc3e12635b913680d260799ea1331bdf270c795",
-  "_spec": "shopify_dev_utils@^1.0.1",
+  "_resolved": "https://registry.npmjs.org/shopify_dev_utils/-/shopify_dev_utils-1.0.7.tgz",
+  "_shasum": "14cba409582e99972041f0699f520df64a0d1f41",
+  "_spec": "shopify_dev_utils@^1.0.4",
   "_where": "/home/alex/Coding/base-theme",
   "author": {
     "name": "Alex Moser"
@@ -36,12 +36,6 @@
   },
   "deprecated": false,
   "description": "",
-  "license": "ISC",
-  "main": "api_requests.js",
-  "name": "shopify_dev_utils",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "keywords": [
     "shopify",
     "themekit",
@@ -49,5 +43,11 @@
     "shopify proxy",
     "browser reload"
   ],
+  "license": "ISC",
+  "main": "api_requests.js",
+  "name": "shopify_dev_utils",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
   "version": "1.0.7"
 }
