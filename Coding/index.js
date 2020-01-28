@@ -178,7 +178,7 @@ function update_theme(type) {
 
         return function update_scripts(event, file_path) {
             try {
-                if (event === "addDir" || event === "add") {
+                if (event === "addDir" || event === "add" || event === "unlinkDir" || "unlink") {
                     start_delay();
                     if (count > 1) return;
                 }
