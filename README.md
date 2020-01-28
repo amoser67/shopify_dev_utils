@@ -1,13 +1,18 @@
-**Shopify Development Utilities Project**
+# Shopify Development Utilities Project
 
 
-**Purpose of Project**
+## README Sections
++ [Purpose of Project][1]
+
+[1]: https://github.com/amoser67/shopify_dev_utils/edit/master/README.md#Features
+
+## Purpose of Project
 
 To provide a stable and customizable development environment for working on Shopify
 sites, meant to replace working with a combination of gulp / themekit.
 
 
-**Features**
+## Features
 
 - Watches your local files, and uploads local changes to your store.
 
@@ -23,7 +28,7 @@ watches them for changes.  When changes occur the file's contents are minified a
 written to theme/assets file according to the procedure below.
 
 
-**Overview**
+## Overview
 
 Expected Directory Structure:
 
@@ -35,27 +40,27 @@ Expected Directory Structure:
         package.json
         run.js
 
-**scripts**
+## Scripts
 
-The *scripts* directory can contain files and sub-directories, however these sub-directories
-may not contain additional directories. We refer to the files which are in the *scripts*
+The scripts directory can contain files and sub-directories, however these sub-directories
+may not contain additional directories. We refer to the files which are in the scripts
 directory as *primary* files, and the files which are in the sub-directories as *secondary* files.
 
-We refer to the JS files we add to *theme/assets* as *modules*. Each module corresponds
+We refer to the JS files we add to theme/assets as *modules*. Each module corresponds
 to either the minified contents of a *primary* file or the minified and concatenated contents
 of all *secondary* files within a sub-directory.  In other words, each sub-directory and *primary*
-file in *scripts* are associated with a *module* of the same name in *theme/assets*.
+file in scripts are associated with a *module* of the same name in theme/assets.
 
-**styles**
+## Styles
 
-The *styles* directory is meant to contain scss files and sub-directories, and
-unlike *scripts*, there is no limit to sub-directory nesting.  However, at this point
-modulation of *styles* is not supported, so there must be a *primary* file in the *styles*
+The styles directory is meant to contain scss files and sub-directories, and
+unlike scripts, there is no limit to sub-directory nesting.  However, at this point
+modulation of styles is not supported, so there must be a *primary* file in the styles
 directory named *main.scss*, and when a change ocurrs in a scss file, *main.scss* will have
-its contents compiled to css, minified, and written to *theme/assets/main.css.liquid*.
+its contents compiled to css, minified, and written to theme/assets/main.css.liquid.
 
 
-**theme**
+## Theme
 
 The theme directory is expected to contain at least the following directories:
 
