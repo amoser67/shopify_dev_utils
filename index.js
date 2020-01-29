@@ -286,7 +286,11 @@ function update_theme(type) {
             let theme_sub_dir;
             let theme_dir;
 //  Changing minified asset files will have no effect.
-            if (file_dir === "assets" && path_parsed.base.includes(".min.")) {
+            if (
+                file_dir === "assets"
+                && path_parsed.base.includes(".min.")
+                && !path_parsed.base.includes("-tr.min")
+            ) {
                 return;
             }
 //  Compute the path to upload the file to.
