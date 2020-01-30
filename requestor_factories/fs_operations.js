@@ -6,7 +6,6 @@ const process = require("process");
 const { run_sync, run_async } = require("../utils");
 const chokidar = require("chokidar");
 const sass = require("node-sass");
-// const jsmin = require("jsmin").jsmin
 const ShopifyAPI = require("./api_requests.js");
 const { log } = require("../log");
 const requestor_factories_dir = __dirname;
@@ -18,6 +17,7 @@ if (platform === "win32") {
 } else if (platform === "darwin") {
     jsmin_path.replace("/jsmin", "/jsmin-darwin");
 }
+const local_data_exists = fs.existsSync(`${shopify_dev_utils_dir}/local-data`);
 
 
 //  Module Public Methods:
@@ -181,24 +181,34 @@ const minify_js = function (input, output) {
                     }
                 }
 
-                run_async(requestors, write_data);
+                run_async(requestors, write_data, data);
 
-                function write_data(data, reason) {
-                    if (data === null) throw reason;
+                function write_data(d, reason) {
+                    if (d === null) throw reason;
+                    if (d === undefined) {
+                        d = data;
+                    }
                     // Let moduleText be the result of fileData.join().
                     const module_text = file_data.join("");
-                    const local_data_path = `${shopify_dev_utils_dir}/local-data/${module_name}`;
+                    const local_data_path = `${shopify_dev_utils_dir}/local-data`;
+                    const write_path = `${local_data_path}/${module_name}`;
+
+                    // if local-data doesnt exist, make the directory,
+                    // and update the file scoped variable local_data_exists.
+                    if (!local_data_exists) {
+                        fs.mkdirSync(local_data_path, {});
+                    }
 
                     // Write moduleText to ../local-data/moduleName
-                    fs.writeFileSync(local_data_path, module_text);
+                    fs.writeFileSync(write_path, module_text);
 
-                    const command = jsmin_path + ' <' + local_data_path + ' >' + output;
+                    const command = jsmin_path + ' <' + write_path + ' >' + output;
 
                     exec(command, function (err, stdout, stderr) {
                         if (err || stderr) {
                             return cb(null, err || stderr);
                         }
-                        fs.unlink(local_data_path, function (err) {
+                        fs.unlink(write_path, function (err) {
                             if (err) log("Error", err);
                         });
                         return cb(data);
@@ -219,20 +229,18 @@ const process_scss = function (file_name, new_file_name=false, paths) {
                 file: file_name,
                 outputStyle: "compressed"
             };
-            sass.render(
-                options,
-                function write_to_output(err, result) {
-                    if (err) return cb(null, err);
-                    fs.writeFile(
-                        new_file_name,
-                        result.css.toString("utf-8"),
-                        function (err) {
-                            if (err) return cb(null, err);
-                            return cb(data);
-                        }
-                    );
-                }
-            );
+
+            sass.render(options, write_to_output);
+
+            function write_to_output(err, result) {
+                if (err) return cb(null, err);
+                const css_buffer = result.css;
+                const css_text = css_buffer.toString("utf-8");
+                fs.writeFile(new_file_name, css_text, function (err) {
+                    if (err) throw err;
+                    return cb(data);
+                });
+            }
         } catch (exception) {
             return cb(null, exception);
         }
@@ -243,15 +251,12 @@ const process_scss = function (file_name, new_file_name=false, paths) {
 const read_file = function (path, enc="utf8") {
     return function read_file_requestor(cb, data) {
         try {
-            fs.readFile(
-                path,
-                enc,
-                function add_content_to_data(err, file_content) {
-                    if (err) return cb(null, err);
-                    data.file_content = file_content;
-                    return cb(data);
-                }
-            );
+            fs.readFile(path, enc, add_content_to_data);
+            function add_content_to_data(err, file_content) {
+                if (err) return cb(null, err);
+                data.file_content = file_content;
+                return cb(data);
+            }
         } catch (exception) {
             return cb(null, exception);
         }
@@ -265,20 +270,21 @@ const start_watchers = function (handler) {
     return function start_watchers_requestor(cb, data) {
         try {
             const options = { ignoreInitial: true };
-            chokidar.watch(
-                data.paths.scripts,
-                options
-            ).on("all", handler("scripts"));
 
-            chokidar.watch(
-                data.paths.styles,
-                options
-            ).on("all", handler("styles"));
+            chokidar.watch(data.paths.scripts, options).on(
+                "all",
+                handler("scripts")
+            );
 
-            chokidar.watch(
-                data.paths.theme,
-                options
-            ).on("all", handler("theme"));
+            chokidar.watch(data.paths.styles, options).on(
+                "all",
+                handler("styles")
+            );
+
+            chokidar.watch(data.paths.theme, options).on(
+                "all",
+                handler("theme")
+            );
 
             return cb(data);
         } catch (exception) {
