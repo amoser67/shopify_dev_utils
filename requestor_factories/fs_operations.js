@@ -17,7 +17,7 @@ if (platform === "win32") {
 } else if (platform === "darwin") {
     jsmin_path.replace("/jsmin", "/jsmin-darwin");
 }
-const local_data_exists = fs.existsSync(`${shopify_dev_utils_dir}/local-data`);
+let local_data_exists = fs.existsSync(`${shopify_dev_utils_dir}/local-data`);
 
 
 //  Module Public Methods:
@@ -197,6 +197,7 @@ const minify_js = function (input, output) {
                     // and update the file scoped variable local_data_exists.
                     if (!local_data_exists) {
                         fs.mkdirSync(local_data_path, {});
+                        local_data_exists = true;
                     }
 
                     // Write moduleText to ../local-data/moduleName
