@@ -10,13 +10,22 @@ const { run_sync, run_async } = require("../utils");
 const dotenv = require("dotenv").config();
 const { log } = require("../log");
 
+let store_url;
+let store_preview_url;
+let theme_id;
+let auth;
+let port;
 
+//  Module Private Methods
+//  make_requestor()
 //  Module Public Methods:
 //  delete_file()
 //  get_shopify_page_html()
-//  make_requestor()
 //  upload_file()
 //  upload_file_array()
+
+//  download_products()
+//  upload_products()
 
 //  Shopify REST Admin API request reference for the "asset" resource type.
 //  PUT
@@ -38,14 +47,8 @@ const { log } = require("../log");
 //  of each other very often, a better solution is to allow the bucket to fill up
 //  as fast as it can, only throttling when necessary.
 
-
-const store_url = process.env.STORE_URL;
-const theme_id = process.env.THEME_ID;
-const auth = process.env.AUTH;
-
-
 const api_version = "2020-01";
-const base_path = "/admin/api/" + api_version + "/themes/";
+const base_path = "/admin/api/" + api_version;
 
 
 //  Any binary encoded files must be processed and uploaded differently than text
@@ -62,16 +65,6 @@ const non_string_formats = [
     ".gif"
 ];
 
-
-//  Creates the request options path.
-function make_path(theme_id, key, method) {
-    let path = base_path;
-    path += theme_id + "/assets.json";
-    if (method !== "PUT") {
-        path += "?asset[key]=" + key;
-    }
-    return path;
-}
 
 
 // An integer representing the number of requests in the last 20 seconds.
@@ -160,83 +153,121 @@ function start_throttling() {
 }
 
 
+function init(data) {
+    store_url = data.store_url;
+    store_preview_url = data.store_preview_url;
+    theme_id = data.theme_id;
+    auth = data.auth;
+    port = data.port;
+}
 
-//  This returns a function which makes an API request to Shopify.
-function make_requestor(
-    method,
-    key,
-    value,
-    value_type = "value"
-) {
+
+//  Creates the request options path.
+function make_path(resource_type, query_string, resource_id = false) {
+    let path = base_path;
+    if (resource_type === "Asset") {
+        path += `/themes/${theme_id}/assets.json`;
+    } else if (resource_type === "Product") {
+        if (resource_id) {
+            path += `/products/${resource_id}.json`
+        } else {
+            path += "/products.json";
+        }
+    }
+
+    path += query_string;
+    return path;
+}
+
+function make_request_options(method, resource_type, query_string, resource_id) {
+    const path = make_path(resource_type, query_string, resource_id);
+    const options = {
+        hostname: store_url,
+        port: 443,
+        path: path,
+        method: method,
+        auth: auth,
+        headers: (method === "PUT" || method === "POST") ? {
+            "Content-Type": "application/json"
+        } : undefined
+    };
+    return options;
+}
+
+/*
+    @param1 {string} method  -  The request method, e.g. "POST", "GET", etc.
+    @param2 {string} resource_type  -  The type of API resource being targeted by
+     the request, e.g. "Asset", "Product", "Metafield", etc.
+    @param3 {object} request_data  -  (optional)  If a PUT or POST request is being
+     made, then this should be the JSON object which will be stringified and sent
+     as the request body.  Additionally, if a request which doesnt require a json request
+     body, but does require a resource_id is being made, this should be a json object
+     with only the id property, e.g. {"product":{"id":342432412}}.
+    @return {function}  -  A requestor function which, when called, will make a request
+    to the REST Admin API, and call its callback upon receiving a response.
+*/
+function make_requestor(method, resource_type, request_data, query_string="") {
+    let resource_id;
+    //  Determine if we are uploading a json object, as opposed to querying
+    //  a particular resource.
+    const is_upload = (method === "POST" || method === "PUT");
+
+    if (resource_type === "Asset") {
+        if (!is_upload) {
+            query_string = `?asset[key]=${request_data["asset"].key}`;
+        }
+    } else if (resource_type === "Product") {
+        if (method !== "POST" && request_data) {
+            resource_id = request_data.request_data["id"];
+        }
+    }
+
+    const options = make_request_options(method, resource_type, query_string, resource_id);
+
     return function requestor(cb, data) {
         try {
             const array = [];
-            let put_data;
-
-            if (value_type === "value") {
-                put_data = JSON.stringify({
-                    "asset": {
-                        "key": key,
-                        "value": value
-                    }
-                });
-            } else if (value_type === "attachment") {
-                put_data = JSON.stringify({
-                    "asset": {
-                        "key": key,
-                        "attachment": value
-                    }
-                });
-            }
-
-            const options = {
-                hostname: store_url,
-                port: 443,
-                path: make_path(theme_id, key, method),
-                method: method,
-                auth: auth,
-                headers: (method === "PUT") ? {
-                    "Content-Type": "application/json"
-                } : undefined
-            };
 
             if (overflow.length === 0 && request_count < bucket_limit) { //  bucket is not full
-                if (is_polling === false) {
+                if (!is_polling) {
                     start_polling();
                 }
-                start_request();
+                make_request();
             } else { //  bucket is full
-                overflow.push(start_request);
-                if (is_throttling === false) {
+                overflow.push(make_request);
+                if (!is_throttling) {
                     return start_throttling();
                 }
             }
 
-            function start_request() {
+            function make_request() {
                 add_request_to_bucket();
-                const request = https.request(options, response => {
-                    if (response.statusCode !== 200) {
-                        if (key !== "templates/customers") {
+                const request = https.request(options, function (response) {
+                    if (response.statusCode.toString().charAt(0) !== "2") {
+                        if (!options.path.includes("templates/customers")) {
                             console.log("statusCode: ", response.statusCode);
-                            console.log("key: ", key);
                         }
                     }
-                    response.on("data", d => {
+                    response.on("data", function (d) {
                         array.push(d);
                     });
-                    response.on("end", err => {
+                    response.on("end", function (err) {
                         if (err) throw err;
+                        if (method === "GET") {
+                            data.results = array.join("");
+                        }
                         return cb(data);
                     });
                 });
-                request.on("error", (err) => {
+                request.on("error", function (err) {
                     log("Error", err);
                 });
-                if (method === "PUT") {
-                    request.write(put_data);
+                if (method === "PUT" || method === "POST") {
+                    request.write(JSON.stringify(request_data));
                 }
                 request.end();
             }
+
         } catch (exception) {
             return cb(null, "requestor " + exception);
         }
@@ -244,12 +275,15 @@ function make_requestor(
 }
 
 
-// @param {string} path - e.g. "assets/my-font.woff2" or "templates/product.liquid".
+
+
+// @param {string} key - e.g. "assets/my-font.woff2" or "templates/product.liquid".
 // Async.
-function delete_file(file_path) {
+function delete_file(key) {
     return function delete_file_requestor(cb, data) {
         try {
-            return make_requestor("DELETE", file_path)(cb, data);
+            const request_data = { "asset": { "key": key } };
+            return make_requestor("DELETE", "Asset", request_data)(cb, data);
         } catch (exception) {
             return cb(null, "delete_file " + exception);
         }
@@ -260,7 +294,7 @@ function delete_file(file_path) {
 //  1.  Makes a GET request to a Shopify store page.
 //  2.  Unzip the response stream and write it to ../store_page_content.html.
 //  3.  When our write stream emits the finished event, call the next function.
-const get_shopify_page_html = function (path="/", is_redirect, location) {
+function get_shopify_page_html(path="/", is_redirect, location) {
     return function get_shopify_page_html_requestor(cb, data) {
         try {
             let hostname;
@@ -356,7 +390,25 @@ function upload_file(path, key, is_binary=false, sync=true) {
 
             fs.readFile(path, file_encoding, function (err, content) {
                 if (err) throw err;
-                make_requestor("PUT", key, content, value_type)(
+                let request_data;
+
+                if (is_binary) {
+                    request_data = {
+                        "asset": {
+                            "key": key,
+                            "attachment": content
+                        }
+                    };
+                } else {
+                    request_data = {
+                        "asset": {
+                            "key": key,
+                            "value": content
+                        }
+                    };
+                }
+
+                make_requestor("PUT", "Asset", request_data)(
                     function (data, reason) {
                         if (data === null) throw reason;
                         if (sync) {
@@ -388,20 +440,13 @@ function upload_file_array(read_from, write_to) {
         try {
             if (read_from === "from data") {
                 read_from = data.files;
-                write_to = data.files.map(
-                    name => name.replace(data.paths.theme + "/", "")
-                );
+                write_to = data.files.map(name => name.replace(data.paths.theme + "/", ""));
             }
             const requestors = read_from.map(
                 function(local_path, index) {
                     const format = path.parse(local_path).ext;
                     const is_binary = non_string_formats.includes(format);
-                    return upload_file(
-                        local_path,
-                        write_to[index],
-                        is_binary,
-                        false
-                    );
+                    return upload_file(local_path, write_to[index], is_binary, false);
                 }
             );
             run_async(
@@ -419,10 +464,38 @@ function upload_file_array(read_from, write_to) {
 }
 
 
+function download_products(query_string) {
+    return function download_products_requestor(cb, data) {
+        try {
+            return make_requestor("GET", "Product", null, query_string)(cb, data);
+        } catch (exception) {
+            return cb(null, exception);
+        }
+    }
+}
+
+// @param1 {object|array} json_objects  -  Can be a single product object to upload,
+//  or an array of them.
+function upload_products(json_objects) {
+    return function upload_products_requestor(cb, data) {
+        try {
+            if (!Array.isArray(json_objects)) {
+                return make_requestor("POST", "Product", json_objects)(cb, data);
+            }
+            const requestors = json_objects.map(object => make_requestor("POST", "Product", object));
+            run_async(requestors, cb, data);
+        } catch (exception) {
+            return cb(null, exception);
+        }
+    }
+}
 
 
 exports.delete_file = delete_file;
 exports.get_shopify_page_html = get_shopify_page_html;
-exports.make_requestor = make_requestor;
+exports.init = init;
 exports.upload_file = upload_file;
 exports.upload_file_array = upload_file_array;
+
+exports.download_products = download_products;
+exports.upload_products = upload_products;

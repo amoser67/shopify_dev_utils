@@ -36,6 +36,12 @@ and theme/template directories, in order to improve project organization.
 watches them for changes.  When changes occur the file's contents are minified and
 written to theme/assets file according to the procedure below.
 
+- Enables the use of a special sub-directory snippets/inline-scripts.  The files
+within this directory must be liquid files consisting of a script element containing JS.
+Each of the files will have their contents minified before they are uploaded to the Shopify
+server, but will be unminified locally.
+
+- Enables one to upload and download products as JSON objects.
 
 
 ## Directory Structure
