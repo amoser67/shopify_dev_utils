@@ -213,6 +213,7 @@ function update_scripts() {
             //  Let data be the initial value object for the requestors sequence.
             const data = Object.create(null);
             const path_parsed = path.parse(file_path);
+
             if (event.includes("Dir")) {
                 const dir_name = path_parsed.base;
                 const key = `assets/${dir_name}.min.js`;

@@ -107,13 +107,17 @@ will end up being a flattened version of their local counterparts.
 
 1. Make sure you are using node v13+.
 
-2. `$ npm i shopify_dev_utils`
+2. From within your project's root directory do the following:
 
-3. `$ npm i dot-env`
+    a. `npm init`
 
-4. Create a private app with read/write theme privileges.
+    b. `npm i shopify_dev_utils`
+    
+    c. `npm i dotenv`
 
-5. Create a .env file and place it in project_root.  It should resemble the following:
+3. Create a private app with read/write theme privileges.
+
+4. Create a .env file and place it in project_root.  It should resemble the following:
 
     AUTH = [private-app-key]:[private-app-pass]<br />
     THEME_ID = 1234567891<br />
@@ -130,7 +134,7 @@ will end up being a flattened version of their local counterparts.
 
     You can also specify a local port number if their are conflicts with the default 8080.
 
-6. Create a file named run.js in project-root. It should be similar to the following:
+5. Create a file named run.js in project-root. It should be similar to the following:
     ```javascript
     const path = require("path");
     const dotenv = require("dotenv").config();
@@ -155,11 +159,11 @@ will end up being a flattened version of their local counterparts.
     }
     ```
 
-7. If you are using a mac, go to project_root/node_modules/shopify_dev_utils,
+6. If you are using a mac, go to project_root/node_modules/shopify_dev_utils,
 and then use xcode to compile jsmin.c to mac OS compatible executable named jsmin-darwin.
 If someone sends me a copy of this executable file I will add it in to the project
 to prevent others from having to do this.
 
-8. `$ node run`
+7. `$ node run`
 
-9. Environment should be setup and running!
+8. Environment should be setup and running!
