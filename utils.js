@@ -17,7 +17,7 @@ const open_browser = function (url) {
     const executable_file = (
         os_type === "Linux" ? "xdg-open"
         : os_type === "Darwin" ? "open"
-        : os_type === "Windows_NT" ? "chrome"
+        : os_type === "Windows_NT" ? "start"
         : undefined
     );
     return function open_browser_requestor(cb, data) {
