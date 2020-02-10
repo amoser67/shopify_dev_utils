@@ -1,6 +1,6 @@
 "use strict";
 const os = require("os");
-const { execFile } = require("child_process");
+const { exec } = require("child_process");
 
 //  Util Public Methods:
 //
@@ -22,16 +22,12 @@ const open_browser = function (url) {
     );
     return function open_browser_requestor(cb, data) {
         try {
-            execFile(
-                executable_file,
-                [ url ],
-                function (error, stdout) {
-                    if (error) throw error;
-                    if (cb) {
-                        return cb(data);
-                    }
+            exec(command + " " + url, function (error, stdout) {
+                if (error) throw error;
+                if (cb) {
+                    return cb(data);
                 }
-            );
+            });
         } catch (exception) {
             return cb(null, exception);
         }
