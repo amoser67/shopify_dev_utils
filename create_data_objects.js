@@ -1,4 +1,4 @@
-const path = require("path");
+const Path = require("path");
 const base = Object.create(null);
 //  These objects are filled with data when data_object_init method is called.
 const paths = Object.create(null);
@@ -29,9 +29,9 @@ const data_objects_init = function (env_vars) {
     return function init_data_requestor(cb, data) {
         try {
             paths.base = env_vars.base_path;
-            paths.scripts = `${paths.base}/scripts`;
-            paths.styles = `${paths.base}/styles`;
-            paths.theme = `${paths.base}/theme`;
+            paths.scripts = Path.join(paths.base, "scripts");
+            paths.styles = Path.join(paths.base, "styles");
+            paths.theme = Path.join(paths.base, "theme");
             auth.store_url = env_vars.store_url;
             auth.store_preview_url = env_vars.store_preview_url;
             auth.theme_id = env_vars.theme_id;

@@ -1,7 +1,7 @@
 "use strict";
 const http = require("http");
 const fs = require("fs");
-const path = require("path");
+const Path = require("path");
 const https = require("https");
 const WebSocket = require("ws");
 const Fs = require("./requestor_factories/fs_operations");
@@ -10,6 +10,7 @@ const Utils = require("./utils");
 const { run_sync, run_async } = Utils;
 const { log } = require("./log");
 const { create_data_object, data_objects_init } = require("./create_data_objects");
+const Commands = require("./commands");
 //  Any binary encoded files must be processed and uploaded differently than text
 //  files. This list is by no means exhaustive, but serves to list all of the binary
 //  file types which may be present in the theme/assets directory.
@@ -21,9 +22,12 @@ const non_string_formats = [
     ".jpg",
     ".eot",
     ".ttf",
-    ".gif"
+    ".ttc",
+    ".gif",
+    ".otf"
 ];
 const theme_dirs = [
+    "config",
     "snippets",  //  Can contain files or dirs, if a dir, its files are joined and then uploaded as dirname.liquid.
     "sections",  //  ""
     "templates/customers",
@@ -42,7 +46,7 @@ let theme_id;
 let auth;
 let port;
 const paths = Object.create(null);
-paths.local_data = `${__dirname}/local-data`;
+paths.local_data = Path.join(__dirname, "local-data");
 
 
 const start = function run_app(env_vars) {
@@ -56,9 +60,9 @@ const start = function run_app(env_vars) {
         port = env_vars.port;
 
         paths.base = env_vars.base_path;
-        paths.scripts = `${paths.base}/scripts`;
-        paths.styles = `${paths.base}/styles`;
-        paths.theme = `${paths.base}/theme`;
+        paths.scripts = Path.join(paths.base, "scripts");
+        paths.styles = Path.join(paths.base, "styles");
+        paths.theme = Path.join(paths.base, "theme");
         data.paths = paths;
 
         ShopifyAPI.init(env_vars);
@@ -84,7 +88,7 @@ const start = function run_app(env_vars) {
             data
         );
     } catch (exception) {
-        log("Error", "start" + exception);
+        log("Error", "start " + exception);
     }
 };
 
@@ -124,6 +128,7 @@ const post_products = function (env_vars, product_data) {
 };
 
 
+exports.deploy = Commands.Deploy;
 
 exports.get_products = get_products;
 exports.post_products = post_products;
@@ -212,13 +217,13 @@ function update_scripts() {
             let requestors;
             //  Let data be the initial value object for the requestors sequence.
             const data = Object.create(null);
-            const path_parsed = path.parse(file_path);
+            const path_parsed = Path.parse(file_path);
 
             if (event.includes("Dir")) {
                 const dir_name = path_parsed.base;
                 const key = `assets/${dir_name}.min.js`;
                 data.key = key;
-                const min_local_path = `${paths.theme}/${key}`;
+                const min_local_path = Path.join(paths.theme, key);
 
                 if (event === "addDir") {
                     requestors = [
@@ -238,19 +243,19 @@ function update_scripts() {
                 return run_sync(requestors, reload_socket, data);
             }
         //  Assert:  This is not a directory event.
-            const dir_path_parts = path_parsed.dir.split("/");
+            const dir_path_parts = path_parsed.dir.split(Path.sep);
             const file_dir = dir_path_parts[dir_path_parts.length - 1];
             const module_is_file = (file_dir === "scripts");
             const min_base = (
                 module_is_file
                 ? path_parsed.base.replace(".js", ".min.js")
-                : `${path.parse(path.dirname(file_path)).base}.min.js`
+                : `${Path.parse(Path.dirname(file_path)).base}.min.js`
             );
             const key = `assets/${min_base}`;
             data.key = key;
 
             if (event === "unlink" && module_is_file) {
-                const min_local_path = `${paths.theme}/${key}`;
+                const min_local_path = Path.join(paths.theme, key);
                 requestors = [
                     ShopifyAPI.delete_file(key),
                     Fs.unlink_file(min_local_path)
@@ -281,8 +286,8 @@ function update_scripts() {
 
 function style_event_handler(event, file_path) {
     try {
-        const base_path = `${paths.styles}/main.scss`;
-        const base_min_path = `${paths.theme}/assets/main.min.css.liquid`;
+        const base_path = Path.join(paths.styles, "main.scss");
+        const base_min_path = Path.join(paths.theme, "assets", "main.min.css.liquid");
         if (event === "change" || event === "add" || event === "unlink") {
             run_sync(
                 [
@@ -305,9 +310,9 @@ function style_event_handler(event, file_path) {
 
 function theme_event_handler(event, file_path) {
     try {
-        const path_parsed = path.parse(file_path);
+        const path_parsed = Path.parse(file_path);
         const file_name = path_parsed.base;
-        const dir_path_parts = path_parsed.dir.split("/");
+        const dir_path_parts = path_parsed.dir.split(Path.sep);
         const file_dir = dir_path_parts[dir_path_parts.length - 1];
 //  Changing minified asset files will have no effect, but they can be deleted.
         if (
@@ -333,19 +338,19 @@ function theme_event_handler(event, file_path) {
             theme_dir = dir_path_parts[dir_path_parts.length - 2];
             if (theme_sub_dir === "customers" && theme_dir === "templates") {
                 write_path = `templates/customers/${path_parsed.base}`;
-                curr_path = paths.theme + "/" + write_path;
+                curr_path = Path.join(paths.theme, write_path);
             } else {
                 write_path = `${theme_dir}/${path_parsed.base}`;
-                curr_path = `${paths.theme}/${theme_dir}/${theme_sub_dir}/${path_parsed.base}`;
+                curr_path = Path.join(paths.theme, theme_dir, theme_sub_dir, path_parsed.base);
             }
         }
 
 //  Handle special cases cases then proceed with updating (adding or removing
 //  the file from the Shopify server).
-        if (file_path.includes("snippets/inline-scripts")) {
+        if (file_path.includes(Path.join("snippets", "inline-scripts"))) {
             fs.readFile(file_path, "utf-8", function (err, results) {
                 if (err) throw err;
-                curr_path = `${paths.local_data}/${file_name}`;
+                curr_path = Path.join(paths.local_data, file_name);
                 write_path = `snippets/${file_name}`;
                 Fs.minify_js(file_path, curr_path)(
                     function (data, reason) {
@@ -402,7 +407,7 @@ function theme_event_handler(event, file_path) {
 //  Used by update theme.
 //  @param1 {string|array} input  -  A path to a js file or an array of them.
 function process_js(input, key) {
-    const upload_from = `${paths.theme}/${key}`;
+    const upload_from = Path.join(paths.theme, key);
     return function process_js_requestor(cb, data) {
         try {
             if (input === "from data") {
@@ -428,7 +433,7 @@ function process_js(input, key) {
 //  3.  Append the script from #2 to the end of the body of the HTML from #1.
 //  4.  Send the result of #3 to the client as a response to this request.
 function server_request_handler(request, response) {
-    const ws_script_path = `${paths.base}/node_modules/shopify_dev_utils/websocket_insert_script.txt`;
+    const ws_script_path = Path.join(paths.base, "node_modules", "shopify_dev_utils", "websocket_insert_script.txt");
     run_sync(
         [
             ShopifyAPI.get_shopify_page_html(request.url),
@@ -436,7 +441,7 @@ function server_request_handler(request, response) {
         ],
         function (data, reason) {
             if (data === null) throw reason;
-            const html_file = `${paths.base}/node_modules/shopify_dev_utils/store_page_content.html`;
+            const html_file = Path.join(paths.base, "node_modules", "shopify_dev_utils", "store_page_content.html");
             fs.open(html_file, "r", function (err, fd) {
                 if (err) {
                     if (err.code === 'ENOENT') {

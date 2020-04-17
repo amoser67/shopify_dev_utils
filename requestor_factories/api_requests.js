@@ -3,7 +3,7 @@
 "use strict";
 const fs = require("fs");
 const https = require("https");
-const path = require("path");
+const Path = require("path");
 const zlib = require("zlib");
 const assert = require("assert");
 const { run_sync, run_async } = require("../utils");
@@ -22,7 +22,7 @@ let port;
 //  delete_file()
 //  get_shopify_page_html()
 //  upload_file()
-//  upload_file_array()
+//  upload_files()
 
 //  download_products()
 //  upload_products()
@@ -64,7 +64,6 @@ const non_string_formats = [
     ".ttf",
     ".gif"
 ];
-
 
 
 // An integer representing the number of requests in the last 20 seconds.
@@ -275,8 +274,6 @@ function make_requestor(method, resource_type, request_data, query_string="") {
 }
 
 
-
-
 // @param {string} key - e.g. "assets/my-font.woff2" or "templates/product.liquid".
 // Async.
 function delete_file(key) {
@@ -294,7 +291,7 @@ function delete_file(key) {
 //  1.  Makes a GET request to a Shopify store page.
 //  2.  Unzip the response stream and write it to ../store_page_content.html.
 //  3.  When our write stream emits the finished event, call the next function.
-function get_shopify_page_html(path="/", is_redirect, location) {
+function get_shopify_page_html(req_path="/", is_redirect, location) {
     return function get_shopify_page_html_requestor(cb, data) {
         try {
             let hostname;
@@ -316,7 +313,7 @@ function get_shopify_page_html(path="/", is_redirect, location) {
             const options = {
                 method: "GET",
                 hostname: hostname,
-                path: path,
+                path: req_path,
                 port: 443,
                 headers: {
                     "cache-control": "no-cache",
@@ -340,9 +337,13 @@ function get_shopify_page_html(path="/", is_redirect, location) {
 
                     return get_shopify_page_html(new_path, true, location_header)(cb, data);
                 } else {
-                    const output = fs.createWriteStream(
-                        `${data.paths.base}/node_modules/shopify_dev_utils/store_page_content.html`
+                    const output_path = Path.join(
+                        data.paths.base,
+                        "node_modules",
+                        "shopify_dev_utils",
+                        "store_page_content.html"
                     );
+                    const output = fs.createWriteStream(output_path);
                     output.on("finish", function () {
                         return cb(data);
                     });
@@ -382,7 +383,7 @@ function get_shopify_page_html(path="/", is_redirect, location) {
 // @param {boolean} is_binary - If the file content is not a string
 //  (i.e. .jpg|.woff2|etc.) then we encode the content into base64 format prior
 //  to sending it.
-function upload_file(path, key, is_binary=false, sync=true) {
+function upload_file(path, key, is_binary=false, sync=true, logResult=false) {
     return function upload_file_requestor(cb, data) {
         try {
             const file_encoding = is_binary ? "base64" : "utf-8";
@@ -412,6 +413,9 @@ function upload_file(path, key, is_binary=false, sync=true) {
                     function (data, reason) {
                         if (data === null) throw reason;
                         if (sync) {
+                            if (logResult) {
+                                log("Uploaded", key);
+                            }
                             return cb(data);
                         } else {
                             log("Uploaded", key);
@@ -435,27 +439,24 @@ function upload_file(path, key, is_binary=false, sync=true) {
 
 
 //  read_from and write_to are arrays of strings.
-function upload_file_array(read_from, write_to) {
-    return function upload_file_array_requestor(cb, data) {
+function upload_files(readWriteMap) {
+    return function upload_files_requestor(cb, data) {
         try {
-            if (read_from === "from data") {
-                read_from = data.files;
-                write_to = data.files.map(name => name.replace(data.paths.theme + "/", ""));
+            const requestors = [];
+
+            for (let [readPath, writeKey] of readWriteMap) {
+                const format = Path.parse(readPath).ext;
+                const isBinary = non_string_formats.includes(format);
+                requestors.push(upload_file(readPath, writeKey, isBinary, true, true));
             }
-            const requestors = read_from.map(
-                function(local_path, index) {
-                    const format = path.parse(local_path).ext;
-                    const is_binary = non_string_formats.includes(format);
-                    return upload_file(local_path, write_to[index], is_binary, false);
-                }
-            );
+            // console.log(readWriteMap);
             run_async(
                 requestors,
-                function(data, reason) {
+                function (data, reason) {
                     if (data === null) throw reason;
                     return cb(data);
                 },
-                create_data_object("auth")
+                Object.create(data)
             );
         } catch (exception) {
             return cb(null, exception);
@@ -495,7 +496,7 @@ exports.delete_file = delete_file;
 exports.get_shopify_page_html = get_shopify_page_html;
 exports.init = init;
 exports.upload_file = upload_file;
-exports.upload_file_array = upload_file_array;
+exports.upload_files = upload_files;
 
 exports.download_products = download_products;
 exports.upload_products = upload_products;

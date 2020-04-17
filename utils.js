@@ -14,7 +14,7 @@ const open_browser = function (url) {
 //  Determine current os in order to choose an applicable binary.
 //  "Linux", "Darwin" (mac), or "Windows_NT" expected.
     const os_type = os.type();
-    const executable_file = (
+    const command = (
         os_type === "Linux" ? "xdg-open"
         : os_type === "Darwin" ? "open"
         : os_type === "Windows_NT" ? "start"

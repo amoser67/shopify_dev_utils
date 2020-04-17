@@ -10,16 +10,15 @@ const ShopifyAPI = require("./api_requests.js");
 const { log } = require("../log");
 const requestor_factories_dir = __dirname;
 const shopify_dev_utils_dir = Path.dirname(__dirname);
-let jsmin_dir_path = Path.join(shopify_dev_utils_dir, "JSMin-master");
-let jsmin_path = Path.join(jsmin_dir_path, "jsmin");
+let jsmin_path = Path.join(shopify_dev_utils_dir, "JSMin-master", "jsmin");
 const platform = process.platform;
 if (platform === "win32") {
     jsmin_path += ".exe";
 } else if (
     platform === "darwin"
-    && fs.existsSync(Path.join(jsmin_dir_path, "jsmin-darwin"))
+    && fs.existsSync(Path.join(jsmin_path, "jsmin-darwin"))
 ) {
-    jsmin_path = Path.join(jsmin_dir_path, "jsmin-darwin");
+    jsmin_path.replace("jsmin", "jsmin-darwin");
 }
 
 
@@ -226,28 +225,17 @@ const process_scss = function (file_name, new_file_name=false, paths) {
                 outputStyle: "compressed"
             };
 
-            sass.render(options, (err, result) => {
+            sass.render(options, write_to_output);
+
+            function write_to_output(err, result) {
                 if (err) return cb(null, err);
                 const css_buffer = result.css;
                 const css_text = css_buffer.toString("utf-8");
-                let final_result;
-
-                function remove_surrounding_quotes_from_liquid_values(cb) {
-                    const reg_a = /\"\{\{/g;
-                    const reg_b = /\}\}\"/g;
-                    final_result = css_text.replace(reg_a, "{{").replace(reg_b, "}}");
-                    return cb();
-                }
-
-                function write_to_output() {
-                    fs.writeFile(new_file_name, final_result, function (err) {
-                        if (err) throw err;
-                        return cb(data);
-                    });
-                }
-
-                return remove_surrounding_quotes_from_liquid_values(write_to_output);
-            });
+                fs.writeFile(new_file_name, css_text, function (err) {
+                    if (err) throw err;
+                    return cb(data);
+                });
+            }
         } catch (exception) {
             return cb(null, exception);
         }
