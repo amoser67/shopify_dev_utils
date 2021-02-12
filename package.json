@@ -1,0 +1,53 @@
+{
+  "_from": "shopify_dev_utils@^1.0.28",
+  "_id": "shopify_dev_utils@1.0.30",
+  "_inBundle": false,
+  "_integrity": "sha512-iUOpNWNoOg3IvNp/hBPYMwBuARJctAYAO77ZNAuarY4Hf343wrDAgQ5SjMAx4mlVJIZI5RQU/j7/U0G+LFyAZA==",
+  "_location": "/shopify_dev_utils",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "range",
+    "registry": true,
+    "raw": "shopify_dev_utils@^1.0.28",
+    "name": "shopify_dev_utils",
+    "escapedName": "shopify_dev_utils",
+    "rawSpec": "^1.0.28",
+    "saveSpec": null,
+    "fetchSpec": "^1.0.28"
+  },
+  "_requiredBy": [
+    "#USER",
+    "/"
+  ],
+  "_resolved": "https://registry.npmjs.org/shopify_dev_utils/-/shopify_dev_utils-1.0.30.tgz",
+  "_shasum": "67996ad861575a4f546ef3cbdf2e999673f3a49c",
+  "_spec": "shopify_dev_utils@^1.0.28",
+  "_where": "/home/alex/Coding/plug-digital/oozewholesale.com",
+  "author": {
+    "name": "Alex Moser"
+  },
+  "bundleDependencies": false,
+  "dependencies": {
+    "chokidar": "^3.3.1",
+    "colors": "^1.4.0",
+    "node-sass": "^4.13.0",
+    "ws": "^7.2.1"
+  },
+  "deprecated": false,
+  "description": "Provides stable and customizable development environment for working on Shopify sites, meant to replace working with a combination of gulp / themekit.",
+  "homepage": "https://github.com/amoser67/shopify_dev_utils",
+  "keywords": [
+    "shopify",
+    "themekit",
+    "development environment",
+    "shopify proxy",
+    "browser reload"
+  ],
+  "license": "ISC",
+  "main": "index.js",
+  "name": "shopify_dev_utils",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "version": "1.0.31"
+}
