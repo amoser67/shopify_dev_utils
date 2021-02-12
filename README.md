@@ -41,7 +41,8 @@ within this directory must be liquid files consisting of a script element contai
 Each of the files will have their contents minified before they are uploaded to the Shopify
 server, but will be unminified locally.
 
-- Enables one to upload and download products as JSON objects.
+- Provides utility functions for use in constructing JS apps/scripts that operate on the Shopify API. For example, the following methods exist:
+get_customer_by_id, get_customers, get_metafields, set_metafields, get_products, and post_products. These functions operate on Shopify's REST Admin API, and are set up to abide by their leaky bucket algorithm, ie throttling appropriately so we don't receive a 429 response. Note, if you are using a PLUS store, feel free to adjust the bucket_size and leak_rate variables in requestor_factories/api_requests.js, from 40 => 80 and 2 => 4, respectively.
 
 
 ## Directory Structure
