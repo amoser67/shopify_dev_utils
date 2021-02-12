@@ -81,9 +81,9 @@ function remove_request_from_bucket() {
 // An array of functions which, when called when start a request that had been throttled.
 const overflow = [];
 //  No more than 40 requests may exist in the bucket.
-const bucket_size = 80;
+const bucket_size = 40;
 //  Bucket loses two elements per second.
-const leak_rate = 4;
+const leak_rate = 2;
 //  We will treat 35 as the limit, so that outside requests or restarting the dev app
 //  have less of a chance of causing a problem.
 const padding = 5;
