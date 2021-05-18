@@ -1,32 +1,31 @@
+/* globals exports, require */
+
 // Modules
-const fs = require("fs");
 const Path = require("path");
 const ShopifyAPI = require("./requestor_factories/api_requests");
 const Fs = require("./requestor_factories/fs_operations");
 const { log } = require("./log");
-const { run_sync, run_async } = require("./utils");
+const { run_sync } = require("./utils");
 const { create_data_object, data_objects_init } = require("./create_data_objects");
 
-let base_path;
 let theme_path;
+
+exports.Deploy = function (env_vars) {
 
 // @purpose:  Upload local theme files to the store's theme.
 // @param1 {array=} filenames - (optional) An array of theme file keys to upload,
 //  if this param is undefined, then all theme files will be uploaded.
-exports.Deploy = function (env_vars) {
+
     data_objects_init(env_vars)(function (data, reason) {
         if (data === null) throw reason;
     });
 
     const data = create_data_object("auth", "paths");
-    base_path = data.paths.base;
     theme_path = data.paths.theme;
 
     data.readWriteMap = new Map();
 
     ShopifyAPI.init(env_vars);
-
-    let themeDirs;
 
     // Build a map from local file paths to the server path/key.
     // This is needed, in part, because we allow a local directory structure

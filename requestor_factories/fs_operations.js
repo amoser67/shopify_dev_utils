@@ -1,16 +1,14 @@
-
+/* globals exports, require, __dirname */
 "use strict";
-
 const { exec } = require("child_process"); // Executes commands in the terminal.
 const fs = require("fs");
 const Path = require("path");
 const process = require("process"); // Used to get the current platform.
-const { run_sync, run_async } = require("../utils");
+const { run_async } = require("../utils");
 const Chokidar = require("chokidar"); // Package for watching changes to files.
 const sass = require("node-sass"); // SCSS compiler.
-const ShopifyAPI = require("./api_requests.js"); // shopify_dev_utils module.
 const { log } = require("../log");
-const requestor_factories_dir = __dirname;
+
 const shopify_dev_utils_dir = Path.dirname(__dirname);
 let jsmin_dir_path = Path.join(shopify_dev_utils_dir, "JSMin-master");
 let jsmin_path = Path.join(jsmin_dir_path, "jsmin");
@@ -25,31 +23,30 @@ if (platform === "win32") {
 }
 
 
-//  Module Public Methods:
-//  get_all_file_paths()
-//  minify_js()
-//  process_scss()
-//  read_file()
-//  start_watchers()
-//  unlink_file()
-//  write_file()
-
+const get_all_file_paths = function (base_dir) {
 
 //  Get all of the file (not directory) paths from a directory (called baseDirectory).
 //  This is done in a breadth first manner, but continues until all files, regardless of depth,
 //  are accounted for.
-const get_all_file_paths = function (base_dir) {
-// After a round of parallelesque operations on the dirs_to_read.
+
     const tmp_dirent_array = [];
+
 // Each round of operations should consist of all dirs currently in here
 // being read, the results saved, and then the dirs removed from here.
+
     const dirs_to_read = [base_dir];
+
     return function get_all_file_paths_requestor(cb, data) {
         try {
+
 // Paths to all files in base directory will eventually be in here.
+
             data.files = [];
+
 //  Initiates the recursive process which determines the path to all nested files.
+
             directory_reader();
+
             function directory_reader() {
                 const total = dirs_to_read.length;
                 let num = 0;
@@ -112,36 +109,21 @@ const get_all_file_paths = function (base_dir) {
                 );
             }
         } catch (exception) {
+            console.log(exception);
             return cb(null, exception);
         }
-    }
-}
+    };
+};
 
-
-//  Minify JS Procedure:
-//
-//  1.  Takes a JS file path or an array of JS file paths, called input.
-//  2a.  If input is a string:
-//           i.    Extract JS.
-//           ii.   Minify the extracted JS.
-//           iii.  Write the minified JS to output.
-//           iv.   Call next function.
-//  2b.  If input is an array, run the following sequence asynchronously for all file paths:
-//          i.    Extract JS.
-//          ii.   Minify the extracted JS.
-//          iii.  Push minified JS to min_js_array.
-//          iv.   If all other files have been processed, join min_js_array, write
-//                the resulting string to output, and call the next function, otherwise
-//                do nothing.
-//
-//  @param1 {string|array} input  - The path(s) to the input file(s).
-//  @param2 {string}       output  - The path to the output file.
 const minify_js = function (input, output) {
 
-    if (typeof input === "string") {
+//  @param1 {string|array} input  - The path(s) to the input file(s).
+//  @param2 {string}       output  - The path to the output file.
+
+    if (typeof input === "string" && input !== "from data") {
         return function minify_js_requestor(cb, data) {
             try {
-                const command = jsmin_path + ' <' + input + ' >' + output;
+                const command = jsmin_path + " <" + input + " >" + output;
                 exec(command, function (err, stdout, stderr) {
                     if (err || stderr) {
                         return cb(null, err || stderr);
@@ -151,73 +133,71 @@ const minify_js = function (input, output) {
             } catch (exception) {
                 return cb(null, exception);
             }
-        }
+        };
     } else {
         return function minify_js_requestors(cb, data) {
             try {
-                // 1. if input is not an array, throw an error.
-                if (!Array.isArray(input)) {
+                const filePaths = data.files;
+
+                if (!Array.isArray(filePaths)) {
                     throw new TypeError("input is not of type array.");
                 }
 
-                // 2. Let fileData be an object.
-                const file_data = Object.create(null);
+                const orderedFileContents = [];
 
-                // 3. Let moduleName be name of the module being minified.
-                let module_name;
-                const output_name = Path.parse(output).base;
-                module_name = output_name.replace(".min.js", "");
-
-                // 4. for each file path in input:
-                //      a. read the file and push the file's content to fileData.
-                const requestors = input.map(getModuleData);
-
-                function getModuleData(file_path, file_index) {
-                    return function getModuleDataRequestor(cb) {
-                        fs.readFile(file_path, "utf-8", function (err, text) {
-                            if (err) return cb(null, err);
-                            file_data[file_index] = text;
-                            return cb();
-                        });
+                const requestors = filePaths.map(
+                    function getModuleData(filePath, fileIndex) {
+                        return function getModuleDataRequestor(cb) {
+                            fs.readFile(filePath, "utf-8", function (err, text) {
+                                if (err) return cb(null, err);
+                                orderedFileContents[fileIndex] = text;
+                                return cb();
+                            });
+                        };
                     }
-                }
+                );
 
-                run_async(requestors, write_data, data);
-
-                function write_data(d, reason) {
-                    if (d === null) throw reason;
-                    if (d === undefined) {
-                        d = data;
-                    }
-
-                    const module_text = Object.keys(file_data).map(key => file_data[key]).join("\n");
-                    const local_data_path = Path.join(shopify_dev_utils_dir, "local-data");
-                    const write_path = Path.join(local_data_path, module_name);
-
-                    // Write moduleText to ../local-data/moduleName
-                    fs.writeFileSync(write_path, module_text);
-
-                    const command = jsmin_path + ' <' + write_path + ' >' + output;
-
-                    exec(command, function (err, stdout, stderr) {
-                        if (err || stderr) {
-                            return cb(null, err || stderr);
+                run_async(
+                    requestors,
+                    function write_data(d, reason) {
+                        if (d === null) return cb(null, reason);
+                        if (d === undefined) {
+                            d = data;
                         }
-                        fs.unlink(write_path, function (err) {
-                            if (err) log("Error", err);
+                        console.log({
+                            output
                         });
-                        return cb(data);
-                    });
-                }
+                        const write_path = Path.join(
+                            Path.join(shopify_dev_utils_dir, "local-data"),
+                            Path.parse(output).name.replace(".min", "")
+                        );
+
+                        // Write moduleText to ../local-data/moduleName
+                        fs.writeFileSync(write_path, orderedFileContents.join("\n"));
+
+                        // Use JSMin to minify the file text at ../local-data/moduleName,
+                        // writing the output to theme/assets.
+                        const command = `${jsmin_path} <${write_path} >${output}`;
+                        exec(command, function minify(err, stdout, stderr) {
+                            if (err || stderr) {
+                                return cb(null, err || stderr);
+                            }
+                            fs.unlink(write_path, function (err) {
+                                if (err) log("Error", err);
+                            });
+                            return cb(data);
+                        });
+                    },
+                    data
+                );
             } catch (exception) {
                 return cb(null, exception);
             }
-        }
+        };
     }
-}
+};
 
-
-const process_scss = function (file_name, new_file_name=false, paths) {
+const process_scss = function (file_name, new_file_name=false) {
     return function process_scss_requestor(cb, data) {
         try {
             const options = {
@@ -232,8 +212,8 @@ const process_scss = function (file_name, new_file_name=false, paths) {
                 let final_result;
 
                 function remove_surrounding_quotes_from_liquid_values(cb) {
-                    const reg_a = /\"\{\{/g;
-                    const reg_b = /\}\}\"/g;
+                    const reg_a = /"\{\{/g;
+                    const reg_b = /\}\}"/g;
                     final_result = css_text.replace(reg_a, "{{").replace(reg_b, "}}");
                     return cb();
                 }
@@ -250,29 +230,30 @@ const process_scss = function (file_name, new_file_name=false, paths) {
         } catch (exception) {
             return cb(null, exception);
         }
-    }
-}
+    };
+};
 
 
 const read_file = function (path, enc="utf8") {
     return function read_file_requestor(cb, data) {
         try {
-            fs.readFile(path, enc, add_content_to_data);
-            function add_content_to_data(err, file_content) {
+            fs.readFile(path, enc, function addContentToData(err, fileContent) {
                 if (err) return cb(null, err);
-                data.file_content = file_content;
+                data.file_content = fileContent;
                 return cb(data);
-            }
+            });
         } catch (exception) {
             return cb(null, exception);
         }
-    }
+    };
 };
 
 
+const start_watchers = function (handler) {
+
 //  @param1 {string} type - One of "theme", "scripts", or "styles".
 //  @param2 {function} handler - The function to be called when an even is triggered.
-const start_watchers = function (handler) {
+
     return function start_watchers_requestor(cb, data) {
         try {
             const options = { ignoreInitial: true };
@@ -283,7 +264,7 @@ const start_watchers = function (handler) {
         } catch (exception) {
             return cb(null, exception);
         }
-    }
+    };
 };
 
 
@@ -297,7 +278,7 @@ const unlink_file = function (file_path) {
         } catch (exception) {
             return cb(null, exception);
         }
-    }
+    };
 };
 
 
@@ -312,7 +293,7 @@ const write_file = function (path, file_content=false) {
         } catch (exception) {
             return cb(null, exception);
         }
-    }
+    };
 };
 
 

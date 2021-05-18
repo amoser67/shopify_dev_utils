@@ -3,3 +3,5 @@ store_page_content.html
 local-data
 
 node_modules
+
+.eslintrc.js

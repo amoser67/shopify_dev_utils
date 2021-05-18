@@ -1,16 +1,17 @@
+/* globals exports, require, __dirname */
 "use strict";
 const http = require("http");
 const fs = require("fs");
 const Path = require("path");
-const https = require("https");
-const WebSocket = require("ws");
+const Websocket = require("ws");
 const Fs = require("./requestor_factories/fs_operations");
 const ShopifyAPI = require("./requestor_factories/api_requests");
 const Utils = require("./utils");
-const { run_sync, run_async } = Utils;
+const { run_sync } = Utils;
 const { log } = require("./log");
 const { create_data_object, data_objects_init } = require("./create_data_objects");
 const Commands = require("./commands");
+
 //  Any binary encoded files must be processed and uploaded differently than text
 //  files. This list is by no means exhaustive, but serves to list all of the binary
 //  file types which may be present in the theme/assets directory.
@@ -39,11 +40,7 @@ const theme_dirs = [
 let server;
 let wss;
 let websocket;
-let browser_url = `http://localhost`;
-let store_url;
-let store_preview_url;
-let theme_id;
-let auth;
+let browser_url = "http://localhost";
 let port;
 const paths = Object.create(null);
 paths.local_data = Path.join(__dirname, "local-data");
@@ -52,23 +49,14 @@ paths.local_data = Path.join(__dirname, "local-data");
 const start = function run_app(env_vars) {
     try {
         const data = Object.create(null);
-
-        store_url = env_vars.store_url;
-        store_preview_url = env_vars.store_preview_url;
-        theme_id = env_vars.theme_id;
-        auth = env_vars.auth;
         port = env_vars.port;
-
         paths.base = env_vars.base_path;
         paths.scripts = Path.join(paths.base, "scripts");
         paths.styles = Path.join(paths.base, "styles");
         paths.theme = Path.join(paths.base, "theme");
         data.paths = paths;
-
         ShopifyAPI.init(env_vars);
 
-        // if local-data doesnt exist, make the directory,
-        // and update the file scoped variable local_data_exists.
         if (!fs.existsSync(paths.local_data)) {
             fs.mkdirSync(paths.local_data, {});
         }
@@ -76,9 +64,9 @@ const start = function run_app(env_vars) {
         run_sync(
             [
                 data_objects_init(env_vars),
-                init_local_server(),
-                create_websocket(),
-                Fs.start_watchers(update_theme),
+                initLocalServer(),
+                createWebsocket(),
+                Fs.start_watchers(updateTheme),
                 Utils.open(`${browser_url}:${port}`)
             ],
             function (data, reason) {
@@ -91,7 +79,6 @@ const start = function run_app(env_vars) {
         log("Error", "start " + exception);
     }
 };
-
 
 //
 // SHOPIFY REST ADMIN API OPERATIONS
@@ -144,7 +131,7 @@ exports.start = start;
 //  Private Functions
 
 
-function init_local_server() {
+function initLocalServer() {
     return function init_server_requestor(cb, data) {
         try {
             server = http.createServer();
@@ -154,44 +141,45 @@ function init_local_server() {
         } catch (exception) {
             return cb(null, exception);
         }
-    }
+    };
 }
 
 
 //  Create a local websocket server.
 //  This enables the client to create a browser websocket to connect with our local
 //  server, enabling client - server two way communication.
-function create_websocket() {
-    return function create_websocket_requestor(cb, data) {
+function createWebsocket() {
+    return function createWebsocketRequestor(cb, data) {
         try {
-            wss = new WebSocket.Server({ server });
+            wss = new Websocket.Server({ server });
             wss.on("connection", function (ws) {
                 ws.send("WebSocket connection established.");
                 websocket = ws;
             });
             return cb(data);
         } catch (exception) {
-            return cb(null, "create_websocket" + exception);
+            return cb(null, "createWebsocket" + exception);
         }
-    }
+    };
 }
 
 
-function update_theme(type) {
+function updateTheme(type) {
     return (
-        type === "scripts" ? update_scripts()
+        type === "scripts" ? updateScripts()
         : type === "styles" ? style_event_handler
         : theme_event_handler
     );
 }
 
-
-
-function restart_socket(data, reason) {
-    if (data === null) throw reason;
+function restartSocket(data, reason) {
+    if (data === null) {
+        log("Error", reason);
+        return;
+    }
     if (data.log_type === "Upload Failed") {
-      log(data.log_type, data.key);
-      websocket.terminate();
+        log(data.log_type, data.key);
+        websocket.terminate();
     } else {
       log("Uploading", data.key);
       setTimeout(function () {
@@ -201,98 +189,152 @@ function restart_socket(data, reason) {
     }
 }
 
+function updateScripts() {
+    let ignoreFileEvents = false;
 
-function update_scripts() {
-    let ignore_file_events = false;
-
-    // Triggered by directory events.
-    function start_delay() {
-        ignore_file_events = true;
+    function startDelay() {
+        ignoreFileEvents = true;
         setTimeout(function () {
-          ignore_file_events = false;
+          ignoreFileEvents = false;
         }, 1000);
     }
 
-    return function script_event_handler(event, file_path) {
+    return function scriptEventHandler(event, filePath) {
         try {
+            // Question:
+            // Does this function cause problems when multiple unrelated directories are deleted?
             if (event === "addDir" || event === "unlinkDir") {
-                start_delay();
+                startDelay();
             }
-            if (ignore_file_events && event === "add" || event === "unlink") {
+
+            if (ignoreFileEvents && event === "add" || event === "unlink") {
                 return;
             }
-            //  Let requestors be an array of functions we will call in sequence.
-            let requestors;
-            //  Let data be the initial value object for the requestors sequence.
-            const data = Object.create(null);
-            const path_parsed = Path.parse(file_path);
 
-            if (event.includes("Dir")) {
-                const dir_name = path_parsed.base;
-                const key = `assets/${dir_name}.min.js`;
-                data.key = key;
-                const min_local_path = Path.join(paths.theme, key);
+            const parentDirName = Path.parse(Path.parse(filePath).dir).name;
+            const moduleGroupPath = getPathToScriptModuleGroup(filePath);
+            const isDirectoryEvent = event.includes("Dir");
 
-                if (event === "addDir") {
-                    requestors = [
-                        Fs.get_all_file_paths(file_path),
-                        process_js("from data", key)
-                    ];
-                    data.log_type = "Uploaded";
+            if (isDirectoryEvent) {
+                return (
+                    (event !== "addDir" && parentDirName === "scripts")
+                    ? deleteGrouplessJsModule(filePath, restartSocket)
+                    : packageJsModuleGroup(moduleGroupPath, restartSocket)
+                );
+            } else {
+                const moduleIsFile = (parentDirName === "scripts" || parentDirName === "templates");
+                if (event === "unlink" && moduleIsFile) {
+                    return deleteGrouplessJsModule(filePath, restartSocket);
 
-                } else {
-                    requestors = [
-                        ShopifyAPI.delete_file(key),
-                        Fs.unlink_file(min_local_path)
-                    ];
-                    data.log_type = "Deleted";
+                } else if (event === "change" || event === "add" || event === "unlink") {
+                    return (
+                        moduleIsFile
+                        ? packageJsModule(filePath, restartSocket)
+                        : packageJsModuleGroup(moduleGroupPath, restartSocket)
+                    );
                 }
-
-                return run_sync(requestors, restart_socket, data);
-            }
-        //  Assert:  This is not a directory event.
-            const dir_path_parts = path_parsed.dir.split(Path.sep);
-            const file_dir = dir_path_parts[dir_path_parts.length - 1];
-            const module_is_file = (file_dir === "scripts" || file_dir === "templates");
-            const min_base = (
-                module_is_file
-                ? path_parsed.base.replace(".js", ".min.js")
-                : `${Path.parse(Path.dirname(file_path)).base}.min.js`
-            );
-            const key = `assets/${min_base}`;
-            data.key = key;
-
-            if (event === "unlink" && module_is_file) {
-                const min_local_path = Path.join(paths.theme, key);
-                requestors = [
-                    ShopifyAPI.delete_file(key),
-                    Fs.unlink_file(min_local_path)
-                ];
-                data.log_type = "Deleted";
-
-            } else if (event === "change" || event === "add" || event === "unlink") {
-                data.log_type = "Uploaded";
-                if (!module_is_file) {
-                    requestors = [
-                        Fs.get_all_file_paths(path_parsed.dir),
-                        process_js("from data", key)
-                    ];
-                } else {
-                    requestors = [ process_js(file_path, key) ];
-                }
-            }
-
-            if (requestors.length > 0) {
-                return run_sync(requestors, restart_socket, data);
             }
         } catch (exception) {
             log("Error", exception);
         }
-    }
+    };
 }
 
+function packageJsModuleGroup(moduleGroupPath, cb) {
+    const data = {
+        log_type: "Uploaded",
+        key: `assets/${Path.parse(moduleGroupPath).name}.min.js`
+    };
+    const outputPath = Path.join(paths.theme, data.key);
+    run_sync([
+        Fs.get_all_file_paths(moduleGroupPath),
+        sortJsFiles(moduleGroupPath),
+        Fs.minify_js("from data", outputPath),
+        ShopifyAPI.upload_file(outputPath, data.key)
+    ], cb, data);
+}
 
-function style_event_handler(event, file_path) {
+function packageJsModule(modulePath, cb) {
+    const data = {
+        log_type: "Uploaded",
+        key: `assets/${Path.parse(modulePath).name}.min.js`
+    };
+    const outputPath = Path.join(paths.theme, data.key);
+    run_sync([
+        Fs.minify_js(modulePath, outputPath),
+        ShopifyAPI.upload_file(outputPath, data.key)
+    ], cb, data);
+}
+
+function deleteGrouplessJsModule(modulePath, cb) {
+    const data = {
+        log_type: "Deleted",
+        key: `assets/${Path.parse(modulePath).name}.min.js`
+    };
+    const outputPath = Path.join(paths.theme, data.key);
+    return run_sync([
+        ShopifyAPI.delete_file(data.key),
+        Fs.unlink_file(outputPath)
+    ], cb, data);
+}
+
+function sortJsFiles(moduleGroupPath) {
+
+// Returns a requestor which sorts data.files based on the presence and content
+// of any _sort-order.js file that exists in the module dir.
+
+    return function sortJsFilesRequestor(cb, data) {
+        try {
+            const moduleFilePaths = data.files;
+            const moduleFileNames = moduleFilePaths.map(path => Path.parse(path).name);
+            if (moduleFileNames.includes("_script-order")) {
+                const sortOrderFilePath = moduleFilePaths[moduleFileNames.indexOf("_script-order")];
+
+                fs.readFile(sortOrderFilePath, "utf8", (err, fileText) => {
+                    if (err) return cb(null, err);
+                    const moduleNames = fileText.split(",").map((str) => str.trim());
+                    data.files = [];
+
+                    (function sortFilePaths(index) {
+                        if (index > moduleNames.length - 1) {
+                            return cb(data);
+                        }
+                        const name = moduleNames[index];
+                        index += 1;
+                        if (moduleFileNames.includes(name)) {
+                            data.files.push(moduleFilePaths[moduleFileNames.indexOf(name)]);
+                            return sortFilePaths(index);
+                        } else {
+                            Fs.get_all_file_paths(
+                                Path.join(moduleGroupPath, name)
+                            )(function (d, reason) {
+                                if (reason) return cb(undefined, reason);
+                                const filePaths = d.files;
+                                filePaths.sort();
+                                filePaths.forEach(function (filePath) {
+                                    data.files.push(filePath);
+                                });
+                                return sortFilePaths(index);
+                            }, Object.create(null));
+                        }
+                    })(0);
+                });
+            } else {
+                return cb(data);
+            }
+        } catch (exception) {
+            return cb(null, data);
+        }
+    };
+}
+
+function getPathToScriptModuleGroup(filePath) {
+    const parsedFileDirPath = Path.parse(filePath).dir;
+    const pathParts = parsedFileDirPath.split(Path.sep);
+    return pathParts.slice(0, pathParts.indexOf("scripts") + 2).join(Path.sep);
+}
+
+function style_event_handler(event) {
     try {
         const base_path = Path.join(paths.styles, "main.scss");
         const base_min_path = Path.join(paths.theme, "assets", "main.min.css.liquid");
@@ -300,20 +342,15 @@ function style_event_handler(event, file_path) {
 		eventData.key = "assets/main.min.css.liquid";
 		eventData.log_type = "Uploaded";
         if (event === "change" || event === "add" || event === "unlink") {
-            run_sync(
-                [
-                    Fs.process_scss(base_path, base_min_path),
-                    ShopifyAPI.upload_file(base_min_path, "assets/main.min.css.liquid")
-                ],
-				restart_socket,
-				eventData
-            );
+            run_sync([
+                Fs.process_scss(base_path, base_min_path),
+                ShopifyAPI.upload_file(base_min_path, "assets/main.min.css.liquid")
+            ], restartSocket, eventData);
         }
     } catch (exception) {
         log("Error", exception);
     }
 }
-
 
 function theme_event_handler(event, file_path) {
     try {
@@ -323,6 +360,7 @@ function theme_event_handler(event, file_path) {
         const file_dir = dir_path_parts[dir_path_parts.length - 1];
 
 //  Changing minified asset files will have no effect, but they can be deleted.
+
         if (
             file_dir === "assets"
             && file_name.includes(".min.")
@@ -357,40 +395,22 @@ function theme_event_handler(event, file_path) {
 		eventData.key = write_path;
 		eventData.log_type = (event === "unlink") ? "Deleted" : "Uploaded";
 
-//  Handle special cases cases then proceed with updating (adding or removing
-//  the file from the Shopify server).
-        if (file_path.includes(Path.join("snippets", "inline-scripts"))) {
-            fs.readFile(file_path, "utf-8", function (err, results) {
-                if (err) throw err;
-                curr_path = Path.join(paths.local_data, file_name);
-                write_path = `snippets/${file_name}`;
-                Fs.minify_js(file_path, curr_path)(
-                    function (data, reason) {
-                        if (data === null) throw reason;
-                        return update_file(true);
-                    },
-                    Object.create(null)
-                );
-            })
-        } else {
-            update_file();
-        }
-
-        function update_file(delete_after=false) {
+        const update_file = function (delete_after=false) {
             if (event === "add" || event === "change") {
                 const is_binary = non_string_formats.includes(path_parsed.ext);
                 ShopifyAPI.upload_file(curr_path, write_path, is_binary)(
                     function (data, reason) {
                         if (data === null) {
-                          eventData.log_type = "Upload Failed";
+                            console.log(reason);
+                            eventData.log_type = "Upload Failed";
                         }
                         if (delete_after) {
                             fs.unlink(curr_path, function (err) {
                                 if (err) throw err;
                             });
                         }
-						// log("Uploaded", write_path);
-                        restart_socket(eventData);
+                        // log("Uploaded", write_path);
+                        restartSocket(eventData);
                     },
                     Object.create(null)
                 );
@@ -398,73 +418,34 @@ function theme_event_handler(event, file_path) {
 
             if (event === "unlink") {
                 ShopifyAPI.delete_file(write_path)(function (data, reason) {
-					if (data === null) {
-						throw reason;
-					}
-					restart_socket(eventData);
-				});
+                    if (data === null) {
+                        throw reason;
+                    }
+                    restartSocket(eventData);
+                });
             }
+        };
+//  Handle special cases cases then proceed with updating (adding or removing
+//  the file from the Shopify server).
+        if (file_path.includes(Path.join("snippets", "inline-scripts"))) {
+            curr_path = Path.join(paths.local_data, file_name);
+            write_path = `snippets/${file_name}`;
+            Fs.minify_js(file_path, curr_path)(
+                function (data, reason) {
+                    if (data === null) throw reason;
+                    return update_file(true);
+                },
+                Object.create(null)
+            );
+        } else {
+            update_file();
         }
+
+
     } catch (exception) {
         log("Error", exception);
     }
 }
-
-
-//  Used by update theme.
-//  @param1 {string|array} input  -  A path to a js file or an array of them.
-function process_js(input, key) {
-    const upload_from = Path.join(paths.theme, key);
-
-    return function process_js_requestor(cb, data) {
-        try {
-    			const minifyAndUpload = function (filePaths) {
-    				const requestors = [
-    					Fs.minify_js(filePaths, upload_from),
-    					ShopifyAPI.upload_file(upload_from, key)
-    				];
-
-    				return run_sync(requestors, cb, data);
-    			};
-
-          if (input === "from data") {
-    				const moduleFilePaths = data.files;
-    				const moduleFileNames = moduleFilePaths.map(function (p) {
-    					let parts = p.split(Path.sep);
-    					return parts[parts.length - 1];
-    			 	});
-    				if (moduleFileNames.includes("_script-order.js")) {
-    					const filePathIndex = moduleFileNames.indexOf("_script-order.js");
-
-    					fs.readFile(
-    						moduleFilePaths[filePathIndex],
-    						"utf8",
-    						function (err, data) {
-    							if (err) return cb(null, err);
-    							const orderComment = data.match(/\/\*[\w\W]+\*\//g)[0];
-    							let fileNames = orderComment.split("\n");
-    							fileNames = fileNames.slice(1, fileNames.length - 1).map(name => name.trim() + ".js");
-    							const filePaths = [];
-    							fileNames.forEach(function (name) {
-    								let moduleFileNameIndex = moduleFileNames.indexOf(name);
-    								let moduleFilePath = moduleFilePaths[moduleFileNameIndex];
-    								filePaths.push(moduleFilePath);
-    							});
-    							minifyAndUpload(filePaths);
-    						}
-    					);
-    				} else {
-    					minifyAndUpload(data.files);
-    				}
-          } else {
-			      minifyAndUpload(input);
-    			}
-        } catch (exception) {
-            return cb(null, exception);
-        }
-    }
-}
-
 
 //  Handle requests to our local server.
 //  1.  Request the store's HTML content.
@@ -483,8 +464,8 @@ function server_request_handler(request, response) {
             const html_file = Path.join(paths.base, "node_modules", "shopify_dev_utils", "store_page_content.html");
             fs.open(html_file, "r", function (err, fd) {
                 if (err) {
-                    if (err.code === 'ENOENT') {
-                        log("Error", "ENOENT: HTML file does not exist")
+                    if (err.code === "ENOENT") {
+                        log("Error", "ENOENT: HTML file does not exist");
                         return;
                     }
                     throw err;

@@ -1,20 +1,19 @@
 //  The following requestors are used to modify the files for a Shopify theme.
 //  author: Alex Moser
+/* global exports, require  */
 "use strict";
 const fs = require("fs");
 const https = require("https");
 const Path = require("path");
 const zlib = require("zlib");
-const assert = require("assert");
-const { run_sync, run_async } = require("../utils");
-const dotenv = require("dotenv").config();
+const { run_async } = require("../utils");
 const { log } = require("../log");
 
 let store_url;
-let store_preview_url;
+// let store_preview_url;
 let theme_id;
 let auth;
-let port;
+// let port;
 
 //  Module Private Methods
 //  make_requestor()
@@ -81,16 +80,15 @@ function remove_request_from_bucket() {
 // An array of functions which, when called when start a request that had been throttled.
 const overflow = [];
 //  No more than 40 requests may exist in the bucket.
-const bucket_size = 40;
+const bucket_size = 80;
 //  Bucket loses two elements per second.
-const leak_rate = 2;
+const leak_rate = 4;
 //  We will treat 35 as the limit, so that outside requests or restarting the dev app
 //  have less of a chance of causing a problem.
 const padding = 5;
 const bucket_limit = bucket_size - padding;
 let is_polling = false;
 let is_throttling = false;
-
 
 //  When a request is added to the bucket, we start polling.  This means that until
 //  the bucket is empty, every 1 / leak_rate seconds, we will reduce request count
@@ -114,7 +112,6 @@ function start_polling() {
 		log("Error", "poller error," + exception);
 	}
 }
-
 
 //  When a function is added to the overflow array, we start the throttler.
 //  The throttler takes the oldest start_request function from the overflow array
@@ -148,10 +145,10 @@ function start_throttling() {
 
 function init(data) {
 	store_url = data.store_url;
-	store_preview_url = data.store_preview_url;
+	// store_preview_url = data.store_preview_url;
 	theme_id = data.theme_id;
 	auth = data.auth;
-	port = data.port;
+	// port = data.port;
 }
 
 
@@ -162,13 +159,13 @@ function make_path(resource_type, query_string, resource_id = false) {
 		path += `/themes/${theme_id}/assets.json`;
 	} else if (resource_type.includes("/metafield")) {
         if (resource_id) {
-            path += `/${resource_type.replace("/metafield", "")}s/${resource_id}/metafields.json`
+            path += `/${resource_type.replace("/metafield", "")}s/${resource_id}/metafields.json`;
         } else { // Only applies when we are accessing shop metafields.
-            path += `/metafields.json`
+            path += "/metafields.json";
         }
 	} else {
 		if (resource_id) {
-			path += `/${resource_type}s/${resource_id}.json`
+			path += `/${resource_type}s/${resource_id}.json`;
 		} else {
 			path += `/${resource_type}s.json`;
 		}
@@ -231,19 +228,7 @@ function make_requestor(
 		try {
 			const responseData = [];
 
-			if (overflow.length === 0 && request_count < bucket_limit) { //  bucket is not full
-				if (!is_polling) {
-					start_polling();
-				}
-				make_request();
-			} else { //  bucket is full
-				overflow.push(make_request);
-				if (!is_throttling) {
-					return start_throttling();
-				}
-			}
-
-			function make_request() {
+			const make_request = function () {
 				add_request_to_bucket();
 				const request = https.request(options, function (response) {
 					response.on("data", function (d) {
@@ -265,7 +250,7 @@ function make_requestor(
 
 						if (method === "GET") {
 							const headerLink = response.headers.link;
-							const regex = /\<|\>/g;
+							const regex = /<|>/g;
 							if (headerLink && headerLink.includes("rel=\"next\"")) {
 								const headerLinkParts = headerLink.split(regex);
 								data.next = (
@@ -291,11 +276,24 @@ function make_requestor(
 					request.write(JSON.stringify(request_data));
 				}
 				request.end();
+			};
+
+			if (overflow.length === 0 && request_count < bucket_limit) { //  bucket is not full
+				if (!is_polling) {
+					start_polling();
+				}
+				make_request();
+			} else { //  bucket is full
+				overflow.push(make_request);
+				if (!is_throttling) {
+					return start_throttling();
+				}
 			}
+
 		} catch (exception) {
 			return cb(null, "requestor " + exception);
 		}
-	}
+	};
 }
 
 
@@ -309,7 +307,7 @@ function delete_file(key) {
 		} catch (exception) {
 			return cb(null, "delete_file " + exception);
 		}
-	}
+	};
 }
 
 
@@ -372,12 +370,12 @@ function get_shopify_page_html(req_path="/", is_redirect, location) {
 							response
 								.pipe(zlib.createBrotliDecompress())
 								.pipe(output);
-							 break;
+							break;
 						case "gzip":
 						case "deflate":
 							response
-								 .pipe(zlib.createUnzip())
-								 .pipe(output);
+								.pipe(zlib.createUnzip())
+								.pipe(output);
 							break;
 						default:
 							response.pipe(output);
@@ -392,8 +390,8 @@ function get_shopify_page_html(req_path="/", is_redirect, location) {
 		} catch (exception) {
 			return cb(null, exception);
 		}
-	}
-};
+	};
+}
 
 
 // @param {string} path - e.g. "assets/my-font.woff2" or "templates/product.liquid".
@@ -411,7 +409,6 @@ function upload_file(
 	return function upload_file_requestor(cb, data) {
 		try {
 			const file_encoding = is_binary ? "base64" : "utf-8";
-			const value_type = is_binary ? "attachment" : "value";
 
 			fs.readFile(path, file_encoding, function (err, content) {
 				if (err) throw err;
@@ -442,7 +439,7 @@ function upload_file(
 			}
 			log("Error", "upload_file " + exception);
 		}
-	}
+	};
 }
 
 
@@ -465,7 +462,7 @@ function upload_files(readWriteMap) {
 		} catch (exception) {
 			return cb(null, exception);
 		}
-	}
+	};
 }
 
 // Note:
@@ -509,7 +506,7 @@ function download_resource(type, fields, query_string) {
                     if (Array.isArray(results)) {
                         resources.push(...results);
                     } else {
-                        log("Error", "Expected response to contain an array of objects, instead returned" + JSON.stringify(resultsToAdd));
+                        log("Error", "Expected response to contain an array of objects, instead returned" + JSON.stringify(results));
                     }
                 }
 				return (
@@ -537,12 +534,11 @@ function upload_resource(type, json_objects, method) {
                     { product: object } // request data
                 );
             });
-            const data = Object.create(null);
-            return run_async(requestors, cb, data);
+            return run_async(requestors, cb, Object.create(null));
         } catch (exception) {
             return cb(null, exception);
         }
-    }
+    };
 }
 
 function download_products(query_string) {
@@ -552,7 +548,7 @@ function download_products(query_string) {
 		} catch (exception) {
 			return cb(null, exception);
 		}
-	}
+	};
 }
 
 // @param1 {object|array} json_objects  -  Can be a single product object to upload,
@@ -568,7 +564,7 @@ function upload_products(json_objects) {
 		} catch (exception) {
 			return cb(null, exception);
 		}
-	}
+	};
 }
 
 // Download all customers
@@ -637,7 +633,7 @@ function download_customer(id, fields) {
 	};
 }
 
-function download_metafields(resource_type, resource_id, namespace) {
+function download_metafields(resource_type, resource_id) {
 	return function download_metafields_requestor(cb) {
 		try {
 			const data = Object.create(null);
