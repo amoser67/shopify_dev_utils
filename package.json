@@ -29,9 +29,9 @@
   "bundleDependencies": false,
   "dependencies": {
     "chokidar": "^3.3.1",
-    "colors": "^1.4.0",
-    "node-sass": "^4.13.0",
-    "ws": "^7.2.1"
+    "fibers": "^5.0.0",
+    "sass": "^1.37.2",
+    "ws": "^7.5.3"
   },
   "deprecated": false,
   "description": "Provides stable and customizable development environment for working on Shopify sites, meant to replace working with a combination of gulp / themekit.",

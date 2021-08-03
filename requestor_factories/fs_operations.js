@@ -6,7 +6,8 @@ const Path = require("path");
 const process = require("process"); // Used to get the current platform.
 const { run_async } = require("../utils");
 const Chokidar = require("chokidar"); // Package for watching changes to files.
-const sass = require("node-sass"); // SCSS compiler.
+const Fiber = require("fibers");
+const sass = require("sass"); // SCSS compiler.
 const { log } = require("../log");
 
 const shopify_dev_utils_dir = Path.dirname(__dirname);
@@ -197,12 +198,11 @@ const minify_js = function (input, output) {
 const process_scss = function (file_name, new_file_name=false) {
     return function process_scss_requestor(cb, data) {
         try {
-            const options = {
+            sass.render({
                 file: file_name,
-                outputStyle: "compressed"
-            };
-
-            sass.render(options, (err, result) => {
+                outputStyle: "compressed",
+                fiber: Fiber
+            }, function (err, result) {
                 if (err) return cb(null, err);
                 const css_buffer = result.css;
                 const css_text = css_buffer.toString("utf-8");
