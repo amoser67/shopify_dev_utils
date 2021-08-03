@@ -1,7 +1,5 @@
-/* globals exports, require */
+/* globals exports */
 "use strict";
-
-const colors = require("colors");
 
 const log = function (action, target) {
 

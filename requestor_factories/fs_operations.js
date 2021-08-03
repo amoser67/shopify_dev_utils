@@ -164,9 +164,6 @@ const minify_js = function (input, output) {
                         if (d === undefined) {
                             d = data;
                         }
-                        console.log({
-                            output
-                        });
                         const write_path = Path.join(
                             Path.join(shopify_dev_utils_dir, "local-data"),
                             Path.parse(output).name.replace(".min", "")

@@ -86,6 +86,7 @@ const start = function run_app(env_vars) {
 // Return a requestor function which takes a callback which it passes the
 // data to once it has been retrieved.
 //
+
 const get_customer_by_id = function (env_vars, id, fields) {
 	ShopifyAPI.init(env_vars);
 	return ShopifyAPI.download_customer(id, fields);
@@ -145,10 +146,13 @@ function initLocalServer() {
 }
 
 
+
+function createWebsocket() {
+
 //  Create a local websocket server.
 //  This enables the client to create a browser websocket to connect with our local
 //  server, enabling client - server two way communication.
-function createWebsocket() {
+
     return function createWebsocketRequestor(cb, data) {
         try {
             wss = new Websocket.Server({ server });
@@ -185,7 +189,7 @@ function restartSocket(data, reason) {
       setTimeout(function () {
           log(data.log_type, data.key);
           websocket.terminate();
-      }, 2000);
+      }, 1000);
     }
 }
 
@@ -223,9 +227,9 @@ function updateScripts() {
                 );
             } else {
                 const moduleIsFile = (parentDirName === "scripts" || parentDirName === "templates");
+
                 if (event === "unlink" && moduleIsFile) {
                     return deleteGrouplessJsModule(filePath, restartSocket);
-
                 } else if (event === "change" || event === "add" || event === "unlink") {
                     return (
                         moduleIsFile
@@ -334,18 +338,47 @@ function getPathToScriptModuleGroup(filePath) {
     return pathParts.slice(0, pathParts.indexOf("scripts") + 2).join(Path.sep);
 }
 
-function style_event_handler(event) {
+function style_event_handler(event, filePath) {
     try {
-        const base_path = Path.join(paths.styles, "main.scss");
-        const base_min_path = Path.join(paths.theme, "assets", "main.min.css.liquid");
-		const eventData = Object.create(null);
-		eventData.key = "assets/main.min.css.liquid";
-		eventData.log_type = "Uploaded";
-        if (event === "change" || event === "add" || event === "unlink") {
-            run_sync([
-                Fs.process_scss(base_path, base_min_path),
-                ShopifyAPI.upload_file(base_min_path, "assets/main.min.css.liquid")
-            ], restartSocket, eventData);
+        const updateMainCss = function () {
+            const base_path = Path.join(paths.styles, "main.scss");
+            const base_min_path = Path.join(paths.theme, "assets", "main.min.css.liquid");
+            const eventData = Object.create(null);
+            eventData.key = "assets/main.min.css.liquid";
+            eventData.log_type = "Uploaded";
+            if (event === "change" || event === "add" || event === "unlink") {
+                run_sync([
+                    Fs.process_scss(base_path, base_min_path),
+                    ShopifyAPI.upload_file(base_min_path, "assets/main.min.css.liquid")
+                ], restartSocket, eventData);
+            }
+        };
+
+        if (filePath.includes(Path.sep + "styles" + Path.sep + "templates" + Path.sep)) {
+            const parsedPath = Path.parse(filePath);
+            const parsedDirPath = Path.parse(parsedPath.dir);
+            const dirName = parsedDirPath.name;
+            fs.readdir(parsedPath.dir, (err, files) => {
+                if (err) throw err;
+                if (files.includes("template.scss")) {
+                    const outputName = dirName + "-template";
+                    const eventData = Object.create(null);
+                    const base_path = Path.join(parsedPath.dir, "template.scss");
+                    const base_min_path = Path.join(paths.theme, "assets", outputName + ".min.css.liquid");
+                    eventData.key = "assets/" + outputName + ".min.css.liquid";
+                    eventData.log_type = "Uploaded";
+                    if (event === "change" || event === "add" || event === "unlink") {
+                        run_sync([
+                            Fs.process_scss(base_path, base_min_path),
+                            ShopifyAPI.upload_file(base_min_path, "assets/" + outputName + ".min.css.liquid")
+                        ], restartSocket, eventData);
+                    }
+                } else {
+                    updateMainCss();
+                }
+            });
+        } else {
+            updateMainCss();
         }
     } catch (exception) {
         log("Error", exception);

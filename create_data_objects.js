@@ -1,5 +1,7 @@
+/* globals exports, require */
+
 const Path = require("path");
-const base = Object.create(null);
+
 //  These objects are filled with data when data_object_init method is called.
 const paths = Object.create(null);
 const auth = Object.create(null);
@@ -9,12 +11,16 @@ const source_array = {
     "paths": paths
 };
 
-//  Each argument should be a name of one of the objects created above, e.g. paths, theme, etc.
 const create_data_object = function (...args) {
+
+//  Each argument should be a name of one of the objects created above, e.g. paths, theme, etc.
+
     if (args.length === 0) {
         return Object.create(null);
     }
+
 //  Get an array of all the source objects we want to assign to the object we return.
+
     const sources = args.map(
         function (source_name) {
             let obj = Object.create(null);
@@ -22,6 +28,7 @@ const create_data_object = function (...args) {
             return obj;
         }
     );
+
     return Object.assign(Object.create(null), ...sources);
 };
 
@@ -40,8 +47,8 @@ const data_objects_init = function (env_vars) {
         } catch (exception) {
             return cb(null, exception);
         }
-    }
-}
+    };
+};
 
 
 exports.create_data_object = create_data_object;

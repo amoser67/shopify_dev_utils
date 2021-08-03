@@ -1,3 +1,4 @@
+/* globals require, exports */
 "use strict";
 const os = require("os");
 const { exec } = require("child_process");
@@ -9,10 +10,11 @@ const { exec } = require("child_process");
 //      3.  run_async()
 //
 
-//  @param1 {string} url  -  e.g. https://google.com
 const open_browser = function (url) {
+
 //  Determine current os in order to choose an applicable binary.
 //  "Linux", "Darwin" (mac), or "Windows_NT" expected.
+
     const os_type = os.type();
     const command = (
         os_type === "Linux" ? "xdg-open"
@@ -22,7 +24,7 @@ const open_browser = function (url) {
     );
     return function open_browser_requestor(cb, data) {
         try {
-            exec(command + " " + url, function (error, stdout) {
+            exec(command + " " + url, function (error, /* stdout */) {
                 if (error) throw error;
                 if (cb) {
                     return cb(data);
@@ -31,13 +33,13 @@ const open_browser = function (url) {
         } catch (exception) {
             return cb(null, exception);
         }
-    }
+    };
 };
 
-
+const run_sync = function (requestors, cb, initial_value) {
 
 //  Run an array of requestors synchronously.
-const run_sync = function (requestors, cb, initial_value) {
+
     let next_number = 0;
     start_requestor(initial_value);
     function start_requestor(value, reason) {
@@ -57,10 +59,12 @@ const run_sync = function (requestors, cb, initial_value) {
             return cb(value);
         }
     }
-}
+};
+
+const run_async = function (requestors, cb, initial_value, time_limit=false) {
 
 //  Run an array of requestors asynchronously.
-const run_async = function (requestors, cb, initial_value, time_limit=false) {
+
     try {
         let timer;
         if (time_limit) {
@@ -91,12 +95,10 @@ const run_async = function (requestors, cb, initial_value, time_limit=false) {
                 return cb();
             }
         }
-
     } catch(err) {
         console.log(err);
     }
 };
-
 
 exports.open = open_browser;
 exports.run_sync = run_sync;
